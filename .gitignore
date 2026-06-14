@@ -1,0 +1,33 @@
+# 依赖与构建输出
+node_modules/
+out/
+dist/
+
+# 本地系统/工具缓存
+.DS_Store
+.eslintcache
+*.log*
+
+# 本地密钥
+.env
+.env.*
+!.env.example
+
+# Agent/IDE 技能镜像，不属于产品源码
+.agents/
+.claude/skills/
+.claude/settings.local.json
+.cursor/
+.gemini/
+skills-lock.json
+
+# 临时设计草稿与截图对照导出图
+landing/
+peeko-logo-hd*-screenshot-match.png
+
+# 内部产品/设计过程文档，不进入公开仓库
+PRODUCT.md
+DESIGN.md
+docs/superpowers/
+docs/peeko-landing-page-brief.md
+src/**/CLAUDE.md

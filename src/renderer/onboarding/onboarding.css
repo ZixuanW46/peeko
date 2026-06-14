@@ -1,0 +1,930 @@
+/* 系统幽灵 × 首启蒙版 v3：
+   高透灰纱 + 灰阶光束；开场只留两件确定能打的事——
+   logo 呼吸浮现、衬线大字 tagline + 光影扫过。
+   字体：ui-serif（New York，系统自带衬线）扛展示层；
+   键帽符号统一用系统 UI 字体（macOS 菜单快捷键同款渲染）。
+   红线：全灰阶、无渐变字、Esc 逃逸瞬时 */
+:root {
+  color-scheme: dark;
+  --ink: rgba(255, 255, 255, 0.92);
+  --ink-2: rgba(255, 255, 255, 0.55);
+  --ink-3: rgba(255, 255, 255, 0.32);
+  --glass: rgba(28, 28, 30, 0.55);
+  --glass-edge: inset 0 0 0 0.5px rgba(255, 255, 255, 0.25);
+  --serif: ui-serif, 'New York', 'Songti SC', Georgia, serif;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: transparent; /* 灰纱移到 #scrim（可挖洞突显浮窗） */
+  font-family: -apple-system, 'PingFang SC', sans-serif;
+  color: var(--ink);
+  user-select: none;
+  cursor: default;
+  opacity: 0;
+  transition: opacity 1.1s ease-out;
+}
+
+/* 聚光灯灰纱：默认全屏灰纱；.spot 时挖成浮窗形状的洞——
+   洞周加深一圈（第二层：浮窗近邻），大面积灰纱较轻（第一层：介绍），浮窗本身透出突显（第二层主体） */
+#scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: rgba(10, 10, 13, 0.34);
+  transition: background 0.3s ease-out;
+}
+
+#scrim.spot {
+  inset: auto; /* 由 JS 设 left/top/width/height 到浮窗矩形 */
+  background: transparent;
+  border-radius: 16px;
+  box-shadow:
+    0 0 40px 6px rgba(0, 0, 0, 0.5),
+    0 0 0 9999px rgba(10, 10, 13, 0.3);
+}
+
+body.lit {
+  opacity: 1;
+}
+
+body.exit {
+  transition: opacity 0.3s ease-out;
+  opacity: 0;
+}
+
+section {
+  position: fixed;
+  inset: 0;
+  z-index: 1; /* 卡片在聚光灯灰纱之上 */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+}
+
+section[hidden] {
+  display: none;
+}
+
+/* ---------- 灰阶光束 ---------- */
+#rays {
+  position: fixed;
+  inset: -10% -20%;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+#rays i {
+  position: absolute;
+  top: -30%;
+  width: 16vw;
+  height: 150%;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.16),
+    rgba(255, 255, 255, 0.05) 45%,
+    transparent 78%
+  );
+  filter: blur(22px);
+  transform-origin: 50% 0;
+  animation: ray-breathe 7s ease-in-out infinite alternate;
+}
+
+#rays i:nth-child(1) {
+  left: 18%;
+  transform: rotate(14deg);
+}
+#rays i:nth-child(2) {
+  left: 34%;
+  width: 10vw;
+  transform: rotate(6deg);
+  animation-delay: -1.6s;
+}
+#rays i:nth-child(3) {
+  left: 48%;
+  width: 20vw;
+  transform: rotate(-2deg);
+  animation-delay: -3.1s;
+}
+#rays i:nth-child(4) {
+  left: 66%;
+  width: 12vw;
+  transform: rotate(-9deg);
+  animation-delay: -4.4s;
+}
+#rays i:nth-child(5) {
+  left: 80%;
+  transform: rotate(-16deg);
+  animation-delay: -5.8s;
+}
+
+@keyframes ray-breathe {
+  from {
+    opacity: 0.45;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ---------- Skip ---------- */
+#skip {
+  position: fixed;
+  top: 48px;
+  right: 28px;
+  z-index: 10;
+  border: 0;
+  padding: 6px 16px;
+  border-radius: 99px;
+  background: var(--glass);
+  box-shadow: var(--glass-edge);
+  color: var(--ink-2);
+  font:
+    12px -apple-system,
+    sans-serif;
+  cursor: pointer;
+}
+
+#skip:hover {
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.14);
+}
+
+/* ---------- Act 0：权限门 ---------- */
+#permission-card {
+  width: min(620px, calc(100vw - 48px));
+  padding: clamp(30px, 7vw, 48px) clamp(32px, 8vw, 56px);
+  border-radius: 28px;
+  background: var(--glass);
+  backdrop-filter: blur(18px);
+  box-shadow:
+    var(--glass-edge),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 30px 90px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  text-align: center;
+}
+
+#permission-step {
+  font:
+    600 12px -apple-system,
+    sans-serif;
+  letter-spacing: 0.14em;
+  color: var(--ink-3);
+  text-transform: uppercase;
+}
+
+#permission-title {
+  font-family: var(--serif);
+  font-size: 44px;
+  font-weight: 800;
+  text-shadow: 0 10px 32px rgba(0, 0, 0, 0.4);
+}
+
+#permission-icon {
+  padding: 15px 24px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0.08));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.42),
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.22),
+    0 18px 48px rgba(0, 0, 0, 0.42);
+  font:
+    600 24px -apple-system,
+    'SF Pro',
+    sans-serif;
+  letter-spacing: 0.08em;
+}
+
+body[data-permission='restart'] #permission-icon {
+  width: 68px;
+  height: 68px;
+  padding: 0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  letter-spacing: 0;
+}
+
+#permission-copy {
+  max-width: 460px;
+  color: var(--ink-2);
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+#permission-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+#permission-action,
+#permission-check,
+#permission-quit {
+  border: 0;
+  padding: 11px 28px;
+  border-radius: 99px;
+  font:
+    600 14px -apple-system,
+    sans-serif;
+  cursor: pointer;
+}
+
+#permission-action,
+#permission-check {
+  background: rgba(255, 255, 255, 0.92);
+  color: rgba(20, 20, 22, 0.95);
+  box-shadow: 0 8px 32px rgba(255, 255, 255, 0.22);
+}
+
+#permission-action:hover,
+#permission-check:hover {
+  background: #fff;
+}
+
+#permission-quit {
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: var(--glass-edge);
+  color: var(--ink);
+}
+
+#permission-quit:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+#permission-status {
+  min-height: 18px;
+  color: var(--ink-3);
+  font-size: 12px;
+}
+
+/* ---------- Act 0.5：快捷键健康门 ---------- */
+#shortcut-card {
+  width: min(620px, calc(100vw - 48px));
+  padding: clamp(28px, 6vw, 44px) clamp(28px, 7vw, 52px);
+  border-radius: 28px;
+  background: var(--glass);
+  backdrop-filter: blur(18px);
+  box-shadow:
+    var(--glass-edge),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 30px 90px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 16px;
+  text-align: center;
+}
+
+#shortcut-step {
+  font:
+    600 12px -apple-system,
+    sans-serif;
+  letter-spacing: 0.14em;
+  color: var(--ink-3);
+  text-transform: uppercase;
+}
+
+#shortcut-title {
+  font-family: var(--serif);
+  font-size: 40px;
+  font-weight: 800;
+  text-shadow: 0 10px 32px rgba(0, 0, 0, 0.4);
+}
+
+#shortcut-copy {
+  max-width: 460px;
+  align-self: center;
+  color: var(--ink-2);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+#shortcut-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 4px 0;
+  text-align: left;
+}
+
+.shortcut-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 14px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.18);
+}
+
+.shortcut-row strong {
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.shortcut-row span {
+  font:
+    13px 'SF Mono',
+    ui-monospace,
+    monospace;
+  color: var(--ink);
+}
+
+.shortcut-row small {
+  grid-column: 1 / -1;
+  color: var(--ink-2);
+  font-size: 12px;
+}
+
+#shortcut-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+
+#shortcut-recommend,
+#shortcut-settings,
+#shortcut-quit {
+  border: 0;
+  padding: 10px 22px;
+  border-radius: 99px;
+  font:
+    600 14px -apple-system,
+    sans-serif;
+  cursor: pointer;
+}
+
+#shortcut-recommend {
+  background: rgba(255, 255, 255, 0.92);
+  color: rgba(20, 20, 22, 0.95);
+  box-shadow: 0 8px 32px rgba(255, 255, 255, 0.22);
+}
+
+#shortcut-settings,
+#shortcut-quit {
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: var(--glass-edge);
+  color: var(--ink);
+}
+
+#shortcut-recommend:hover {
+  background: #fff;
+}
+
+#shortcut-settings:hover,
+#shortcut-quit:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+#shortcut-status {
+  min-height: 18px;
+  color: var(--ink-3);
+  font-size: 12px;
+}
+
+/* ---------- Act I：logo 呼吸 ---------- */
+#logo {
+  width: 190px;
+  height: 190px;
+  border-radius: 42px;
+  box-shadow:
+    0 30px 90px rgba(0, 0, 0, 0.55),
+    0 0 110px rgba(255, 255, 255, 0.22);
+  opacity: 0;
+  transform: scale(0.92);
+  filter: blur(18px);
+  transition:
+    opacity 1.8s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 1.8s cubic-bezier(0.22, 1, 0.36, 1),
+    filter 1.8s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+#logo.in {
+  opacity: 1;
+  transform: scale(1);
+  filter: blur(0);
+}
+
+#logo.out {
+  opacity: 0;
+  transform: scale(1.06);
+  filter: blur(12px);
+  transition-duration: 1s;
+}
+
+/* ---------- 独幕 tagline：光团孕育 → 爆发显字 → 全屏光影扫过 ---------- */
+#orb {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  width: 60px;
+  height: 60px;
+  margin: -30px 0 0 -30px;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.95) 0%,
+    rgba(255, 255, 255, 0.5) 32%,
+    rgba(255, 255, 255, 0.12) 62%,
+    transparent 75%
+  );
+  filter: blur(2px);
+  opacity: 0;
+  transform: scale(0.2);
+}
+
+#orb.grow {
+  animation: orb-grow 1.5s cubic-bezier(0.3, 0, 0.6, 1) forwards;
+}
+
+@keyframes orb-grow {
+  0% {
+    opacity: 0;
+    transform: scale(0.2);
+  }
+  25% {
+    opacity: 0.8;
+  }
+  100% {
+    opacity: 1;
+    transform: scale(3.2);
+  }
+}
+
+#orb.burst {
+  animation: orb-burst 0.5s cubic-bezier(0.2, 0, 0.4, 1) forwards;
+}
+
+@keyframes orb-burst {
+  0% {
+    opacity: 1;
+    transform: scale(3.2);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(9);
+  }
+}
+
+#tagline {
+  position: relative;
+  font-family: var(--serif);
+  font-size: 100px;
+  font-weight: 800;
+  line-height: 1.14;
+  letter-spacing: 0.01em;
+  text-align: center;
+  color: #fff;
+  /* 立体感：上缘受光、下缘沉影、远处辉光（阴影分层，不用渐变字） */
+  text-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.5),
+    0 -1px 0 rgba(0, 0, 0, 0.3),
+    0 24px 70px rgba(0, 0, 0, 0.6),
+    0 0 140px rgba(255, 255, 255, 0.32);
+  opacity: 0;
+  transform: scale(0.96);
+  filter: blur(10px);
+  /* 爆发瞬间显字：入场要快，余韵交给 shine */
+  transition:
+    opacity 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.9s cubic-bezier(0.22, 1, 0.36, 1),
+    filter 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+#tagline.in {
+  opacity: 1;
+  transform: scale(1);
+  filter: blur(0);
+}
+
+/* 全屏光影：一道斜向高光横扫整个屏幕 */
+#shine {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    105deg,
+    transparent 40%,
+    rgba(255, 255, 255, 0.22) 47%,
+    rgba(255, 255, 255, 0.45) 50%,
+    rgba(255, 255, 255, 0.22) 53%,
+    transparent 60%
+  );
+  background-size: 240% 100%;
+  background-position: 130% 0;
+  background-repeat: no-repeat;
+  filter: blur(10px);
+  opacity: 0;
+}
+
+#shine.run {
+  animation: shine-sweep 1.8s cubic-bezier(0.45, 0, 0.2, 1) forwards;
+}
+
+@keyframes shine-sweep {
+  0% {
+    opacity: 0;
+    background-position: 130% 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  88% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    background-position: -30% 0;
+  }
+}
+
+/* ---------- Act II：闯关（占屏更大） ---------- */
+#card {
+  width: min(720px, 62vw);
+  padding: 56px 64px;
+  border-radius: 28px;
+  background: var(--glass);
+  backdrop-filter: blur(18px);
+  box-shadow:
+    var(--glass-edge),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 30px 90px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  text-align: center;
+  transition:
+    opacity 0.3s ease-out,
+    transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+#card.swap {
+  opacity: 0;
+  transform: translateY(12px);
+}
+
+#card-step {
+  font:
+    600 12px -apple-system,
+    sans-serif;
+  letter-spacing: 0.14em;
+  color: var(--ink-3);
+  text-transform: uppercase;
+}
+
+#card-title {
+  font-family: var(--serif);
+  font-size: 44px;
+  font-weight: 800;
+  text-shadow: 0 10px 32px rgba(0, 0, 0, 0.4);
+}
+
+#card-keys {
+  display: flex;
+  gap: 12px;
+  margin: 14px 0 6px;
+}
+
+/* 键帽：系统 UI 字体渲染符号（macOS 菜单快捷键同款，大小统一） */
+.keycap {
+  min-width: 64px;
+  height: 64px;
+  padding: 0 16px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.1));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 -8px 16px rgba(0, 0, 0, 0.18),
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.3),
+    0 12px 32px rgba(0, 0, 0, 0.38);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: -apple-system, 'SF Pro', sans-serif;
+  font-size: 26px;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--ink);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  transition:
+    background 0.14s ease-out,
+    box-shadow 0.14s ease-out,
+    transform 0.14s ease-out;
+}
+
+.keycap.press,
+.keycap.done {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.25));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    inset 0 -4px 10px rgba(0, 0, 0, 0.12),
+    0 0 52px rgba(255, 255, 255, 0.5),
+    0 6px 18px rgba(0, 0, 0, 0.3);
+}
+
+.keycap.press {
+  transform: translateY(3px) scale(0.97);
+}
+
+/* 完成态：比"按下/按住"更强的白光爆发 + 缩放脉冲 + 文字转暗——"当一下、过关了"的确定感 */
+.keycap.complete {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.6));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    0 0 72px 8px rgba(255, 255, 255, 0.9),
+    0 6px 18px rgba(0, 0, 0, 0.3);
+  color: rgba(20, 20, 22, 0.95);
+  animation: capComplete 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes capComplete {
+  0% {
+    transform: scale(1);
+  }
+  30% {
+    transform: scale(1.14);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+#card-hint {
+  font-size: 17px;
+  color: var(--ink);
+  min-height: 24px;
+  max-width: 520px;
+}
+
+/* 关键事实强调行：本关真正要学到的那句话 */
+#card-fact {
+  margin-top: 4px;
+  padding: 8px 18px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.2);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+#card-fact:empty {
+  display: none;
+}
+
+/* 控制条图例：第五关的工具清单 */
+#card-legend {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 28px;
+  margin-top: 6px;
+  text-align: left;
+}
+
+#card-legend[hidden] {
+  display: none;
+}
+
+.legend-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--ink-2);
+  padding: 4px 0;
+}
+
+.legend-row svg,
+.legend-row .lg {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.14);
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink);
+  font-size: 13px;
+  padding: 5px;
+}
+
+#card-action {
+  border: 0;
+  margin-top: 6px;
+  padding: 10px 26px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.16);
+  box-shadow: var(--glass-edge);
+  color: var(--ink);
+  font:
+    600 14px -apple-system,
+    sans-serif;
+  cursor: pointer;
+}
+
+#card-action:hover {
+  background: rgba(255, 255, 255, 0.26);
+}
+
+/* ---------- 快捷键总览（Act I.5）---------- */
+#cheat-card {
+  width: min(680px, 66vw);
+  padding: 40px 48px;
+  border-radius: 28px;
+  background: var(--glass);
+  backdrop-filter: blur(18px);
+  box-shadow:
+    var(--glass-edge),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 30px 90px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  opacity: 0;
+  transform: translateY(12px);
+  transition:
+    opacity 0.45s ease-out,
+    transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+#cheatsheet.in #cheat-card {
+  opacity: 1;
+  transform: none;
+}
+
+#cheat-title {
+  font-family: var(--serif);
+  font-size: 34px;
+  font-weight: 800;
+  text-align: center;
+}
+
+#cheat-sub {
+  margin-top: -6px;
+  font-size: 15px;
+  color: var(--ink-2);
+  text-align: center;
+}
+
+#cheat-list {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  margin: 10px 0 2px;
+}
+
+.cheat-row {
+  display: grid;
+  grid-template-columns: 124px 1fr;
+  align-items: center;
+  gap: 18px;
+}
+
+.cheat-keys {
+  display: flex;
+  gap: 6px;
+}
+
+/* 小号键帽（覆盖闯关大键帽尺寸） */
+.cheat-keys .keycap {
+  min-width: 32px;
+  height: 32px;
+  padding: 0 8px;
+  border-radius: 8px;
+  font-size: 14px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.25),
+    0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.cheat-label {
+  font-size: 14px;
+  line-height: 1.35;
+  color: var(--ink);
+}
+
+#cheat-next {
+  align-self: center;
+  border: 0;
+  margin-top: 10px;
+  padding: 11px 30px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.16);
+  box-shadow: var(--glass-edge);
+  color: var(--ink);
+  font:
+    600 15px -apple-system,
+    sans-serif;
+  cursor: pointer;
+}
+
+#cheat-next:hover {
+  background: rgba(255, 255, 255, 0.26);
+}
+
+#dots {
+  display: flex;
+  gap: 9px;
+  margin-top: 30px;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.22);
+  transition: background 0.2s ease-out;
+}
+
+.dot.on {
+  background: rgba(255, 255, 255, 0.85);
+}
+
+/* ---------- Act III ---------- */
+#finale h2 {
+  font-family: var(--serif);
+  font-size: 64px;
+  font-weight: 800;
+  opacity: 0;
+  filter: blur(10px);
+  text-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.5),
+    0 18px 56px rgba(0, 0, 0, 0.55),
+    0 0 110px rgba(255, 255, 255, 0.28);
+  transition:
+    opacity 1.2s cubic-bezier(0.22, 1, 0.36, 1),
+    filter 1.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+#finale.in h2 {
+  opacity: 1;
+  filter: blur(0);
+}
+
+#finale .sub {
+  font-size: 15px;
+  color: var(--ink-2);
+}
+
+#start {
+  border: 0;
+  padding: 13px 36px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.92);
+  color: rgba(20, 20, 22, 0.95);
+  font:
+    600 15px -apple-system,
+    sans-serif;
+  cursor: pointer;
+  box-shadow: 0 8px 32px rgba(255, 255, 255, 0.25);
+}
+
+#start:hover {
+  background: #fff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #rays i {
+    animation: none;
+  }
+  #tagline.in #shine {
+    animation: none;
+  }
+  .keycap.complete {
+    animation: none;
+  }
+  body,
+  .keycap,
+  #card,
+  #permission-card,
+  #logo,
+  #tagline,
+  #finale h2 {
+    transition: none;
+  }
+}

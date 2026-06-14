@@ -1,0 +1,447 @@
+/* 系统幽灵：模仿 macOS 系统设置——sidebar 材质 + 分组圆角卡片 +
+   浅/深色自适应语义标签色。红线：无强调色、仅系统字体、SF Mono 键帽 */
+:root {
+  color-scheme: light dark;
+  --label: rgba(0, 0, 0, 0.85);
+  --secondary: rgba(0, 0, 0, 0.5);
+  --tertiary: rgba(0, 0, 0, 0.35);
+  --card: rgba(255, 255, 255, 0.55);
+  --separator: rgba(0, 0, 0, 0.08);
+  --capsule: rgba(0, 0, 0, 0.06);
+  --capsule-border: rgba(0, 0, 0, 0.12);
+  --hover: rgba(0, 0, 0, 0.08);
+  --switch-off: rgba(0, 0, 0, 0.18);
+  --switch-on: rgba(0, 0, 0, 0.65);
+  --tooltip-bg: #fff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --label: rgba(255, 255, 255, 0.88);
+    --secondary: rgba(255, 255, 255, 0.55);
+    --tertiary: rgba(255, 255, 255, 0.35);
+    --card: rgba(255, 255, 255, 0.07);
+    --separator: rgba(255, 255, 255, 0.08);
+    --capsule: rgba(255, 255, 255, 0.1);
+    --capsule-border: rgba(255, 255, 255, 0.16);
+    --hover: rgba(255, 255, 255, 0.14);
+    --switch-off: rgba(255, 255, 255, 0.22);
+    --switch-on: rgba(255, 255, 255, 0.8);
+    --tooltip-bg: #242426;
+  }
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* 整窗可拖（macOS 偏好窗惯例），交互控件单独豁免 */
+body {
+  background: transparent;
+  font:
+    13px -apple-system,
+    'PingFang SC',
+    sans-serif;
+  color: var(--label);
+  user-select: none;
+  padding-top: 38px; /* hiddenInset 红绿灯让位 */
+  -webkit-app-region: drag;
+  display: flex;
+  flex-direction: column;
+}
+
+/* macOS 系统设置节奏：节间 22px，节标题与卡片 7px，卡片行高 38px */
+main {
+  padding: 0 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-app-region: no-drag;
+}
+
+h2 {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--label);
+  margin: 0 2px 7px;
+}
+
+.sec-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.text-btn {
+  -webkit-app-region: no-drag;
+  border: 0;
+  background: transparent;
+  color: var(--secondary);
+  font:
+    11px -apple-system,
+    'PingFang SC',
+    sans-serif;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-bottom: 7px;
+}
+
+.text-btn:hover {
+  background: var(--hover);
+  color: var(--label);
+}
+
+.hint {
+  font-size: 11px;
+  color: var(--tertiary);
+  margin: 7px 2px 0;
+}
+
+.hint.warn:not(:empty) {
+  color: var(--label);
+}
+
+/* 分组卡片：系统设置的核心视觉单元 */
+ul {
+  list-style: none;
+  background: var(--card);
+  border-radius: 10px;
+  box-shadow: inset 0 0 0 0.5px var(--separator);
+  overflow: hidden;
+}
+
+li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 38px;
+  padding: 6px 12px;
+  border-bottom: 0.5px solid var(--separator);
+}
+
+li:last-child {
+  border-bottom: none;
+}
+
+.label-with-info {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: visible;
+}
+
+.info-btn {
+  -webkit-app-region: no-drag;
+  width: 15px;
+  height: 15px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--capsule);
+  box-shadow: inset 0 0 0 0.5px var(--capsule-border);
+  color: var(--secondary);
+  cursor: help;
+  font:
+    11px 'SF Mono',
+    ui-monospace,
+    monospace;
+  line-height: 15px;
+  text-align: center;
+  padding: 0;
+  flex: none;
+}
+
+.info-btn:hover {
+  background: var(--hover);
+  color: var(--label);
+}
+
+.info-pop {
+  position: absolute;
+  left: calc(100% + 8px);
+  top: 50%;
+  z-index: 10;
+  width: max-content;
+  max-width: 320px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: var(--tooltip-bg);
+  box-shadow:
+    inset 0 0 0 0.5px var(--separator),
+    0 8px 24px rgba(0, 0, 0, 0.18);
+  color: var(--label);
+  font:
+    11px -apple-system,
+    'PingFang SC',
+    sans-serif;
+  line-height: 1.35;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-50%) translateX(-2px);
+  transition:
+    opacity 0.12s ease-out,
+    transform 0.12s ease-out;
+}
+
+.info-btn:hover + .info-pop,
+.info-btn:focus-visible + .info-pop {
+  opacity: 1;
+  transform: translateY(-50%) translateX(0);
+}
+
+/* macOS 风格开关（全灰阶：No-Accent Rule） */
+.switch {
+  -webkit-app-region: no-drag;
+  width: 38px;
+  height: 22px;
+  border: 0;
+  border-radius: 11px;
+  background: var(--switch-off);
+  position: relative;
+  cursor: pointer;
+  transition: background 0.15s ease-out;
+  flex: none;
+}
+
+.switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  transition: transform 0.15s ease-out;
+}
+
+.switch[aria-checked='true'] {
+  background: var(--switch-on);
+}
+
+.switch[aria-checked='true']::after {
+  transform: translateX(16px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .switch,
+  .switch::after {
+    transition: none;
+  }
+}
+
+.range-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+
+.range-wrap input[type='range'] {
+  -webkit-app-region: no-drag;
+  width: 120px;
+  accent-color: var(--switch-on);
+  cursor: pointer;
+}
+
+.range-val {
+  font:
+    12px 'SF Mono',
+    ui-monospace,
+    monospace;
+  color: var(--secondary);
+  min-width: 34px;
+  text-align: right;
+}
+
+.version-pill,
+.update-status {
+  color: var(--secondary);
+  font:
+    12px 'SF Mono',
+    ui-monospace,
+    monospace;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.button-cluster {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.button-cluster .text-btn:disabled {
+  color: var(--tertiary);
+  cursor: default;
+}
+
+.button-cluster .text-btn:disabled:hover {
+  background: transparent;
+  color: var(--tertiary);
+}
+
+select {
+  -webkit-app-region: no-drag;
+  min-width: 132px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--capsule);
+  color: var(--label);
+  box-shadow: inset 0 0 0 0.5px var(--capsule-border);
+  font:
+    12px -apple-system,
+    'PingFang SC',
+    sans-serif;
+  padding: 4px 24px 4px 8px;
+  outline: 0;
+  cursor: pointer;
+}
+
+select:hover {
+  background: var(--hover);
+}
+
+kbd {
+  -webkit-app-region: no-drag;
+  font:
+    12px 'SF Mono',
+    ui-monospace,
+    monospace;
+  color: var(--label);
+  padding: 3px 9px;
+  border-radius: 6px;
+  background: var(--capsule);
+  box-shadow: inset 0 0 0 0.5px var(--capsule-border);
+  cursor: pointer;
+  min-width: 76px;
+  text-align: center;
+  white-space: nowrap;
+  flex: none;
+}
+
+kbd:hover {
+  background: var(--hover);
+}
+
+kbd.recording {
+  background: var(--hover);
+  animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  50% {
+    background: var(--capsule);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  kbd.recording {
+    animation: none;
+  }
+}
+
+.err {
+  font-size: 11px;
+  color: var(--secondary);
+  flex: 1;
+  text-align: right;
+}
+
+.err.ok {
+  color: var(--tertiary);
+}
+
+.shortcut-critical .err {
+  color: var(--label);
+}
+
+.shortcut-warning .err {
+  color: var(--secondary);
+}
+
+/* 收藏行：名称 + 网址两行，名称可点击重命名 */
+.fav-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+
+.fav-name {
+  -webkit-app-region: no-drag;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--label);
+  cursor: text;
+  border-radius: 4px;
+  padding: 1px 4px;
+  margin-left: -4px;
+}
+
+.fav-name:hover {
+  background: var(--hover);
+}
+
+.fav-url {
+  font-size: 11px;
+  color: var(--tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-left: 0;
+}
+
+.fav-rename {
+  -webkit-app-region: no-drag;
+  border: 0;
+  outline: 0;
+  border-radius: 4px;
+  background: var(--capsule);
+  box-shadow: inset 0 0 0 0.5px var(--capsule-border);
+  color: var(--label);
+  font:
+    13px -apple-system,
+    'PingFang SC',
+    sans-serif;
+  padding: 1px 4px;
+  margin-left: -4px;
+  width: 100%;
+}
+
+.del {
+  -webkit-app-region: no-drag;
+  border: 0;
+  background: transparent;
+  color: var(--tertiary);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 2px 7px;
+  border-radius: 5px;
+  flex: none;
+}
+
+.del:hover {
+  background: var(--hover);
+  color: var(--label);
+}

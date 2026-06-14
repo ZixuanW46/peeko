@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; style-src 'self' 'unsafe-inline'"
+    />
+    <link rel="stylesheet" href="./tray.css" />
+    <title>Peeko</title>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div>
+          <h1>Peeko</h1>
+          <p id="status">Menu bar player</p>
+        </div>
+        <button id="visible-toggle" class="switch" aria-label="Show or hide window"></button>
+      </header>
+
+      <div class="divider"></div>
+
+      <section class="group">
+        <button class="row" data-action="cinema">
+          <span id="cinema-label">Cinema Mode</span>
+          <span class="check">✓</span>
+        </button>
+        <button class="row" data-action="favorite">
+          <span id="favorite-label">Favorite Page</span>
+        </button>
+      </section>
+
+      <div class="divider"></div>
+
+      <section class="group">
+        <button class="row" data-action="home">
+          <span id="home-label">World Cup Home</span>
+        </button>
+        <button class="row" data-action="clipboard">
+          <span id="clipboard-label">Open Link from Clipboard</span>
+        </button>
+      </section>
+
+      <section id="fav-section" hidden>
+        <div class="divider"></div>
+        <p id="favorites-title" class="section-title">Favorites</p>
+        <div id="favorites" class="group"></div>
+      </section>
+
+      <div class="divider"></div>
+
+      <section class="group">
+        <button id="update-row" class="row" data-action="update-check">
+          <span id="update-label">Check for Updates…</span>
+        </button>
+        <button class="row" data-action="settings">
+          <span id="settings-label">Settings…</span>
+        </button>
+        <button class="row" data-action="quit">
+          <span id="quit-label">Quit Peeko</span>
+        </button>
+      </section>
+    </main>
+    <script type="module" src="./tray.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,51 @@
+appId: com.will.peeko
+productName: Peeko
+directories:
+  buildResources: build
+files:
+  - '!**/.vscode/*'
+  - '!src/*'
+  - '!electron.vite.config.{js,ts,mjs,cjs}'
+  - '!{.eslintcache,eslint.config.mjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
+  - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
+  - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+asarUnpack:
+  - resources/**
+  - node_modules/uiohook-napi/**
+win:
+  executableName: Peeko
+nsis:
+  artifactName: ${name}-${version}-setup.${ext}
+  shortcutName: ${productName}
+  uninstallDisplayName: ${productName}
+  createDesktopShortcut: always
+afterSign: scripts/adhoc-sign.mjs
+mac:
+  hardenedRuntime: true
+  notarize: true
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  target:
+    - dmg
+    - zip
+  # Developer ID 证书 + APPLE_KEYCHAIN_PROFILE 存在时，electron-builder 正式签名并公证。
+  # 无证书的本地开发包由 afterSign 钩子补 ad-hoc；正式发布必须看验签结果。
+  extendInfo:
+    LSUIElement: true # 菜单栏附件应用：无 Dock 图标
+dmg:
+  artifactName: ${name}-${version}.${ext}
+linux:
+  target:
+    - AppImage
+    - snap
+    - deb
+  maintainer: electronjs.org
+  category: Utility
+appImage:
+  artifactName: ${name}-${version}.${ext}
+npmRebuild: false
+publish:
+  provider: github
+  owner: ZixuanW46
+  repo: peeko
+  releaseType: release

@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; style-src 'self' 'unsafe-inline'"
+    />
+    <link rel="stylesheet" href="./settings.css" />
+    <title>Peeko Settings</title>
+  </head>
+  <body>
+    <main>
+      <section>
+        <h2 id="general-title">General</h2>
+        <ul>
+          <li>
+            <span class="label-with-info">
+              <span id="auto-cinema-label">Auto Cinema Mode</span>
+              <button
+                id="auto-cinema-info"
+                class="info-btn"
+                type="button"
+                aria-label="Info"
+                aria-describedby="auto-cinema-tip"
+              >
+                i
+              </button>
+              <span id="auto-cinema-tip" class="info-pop" role="tooltip"></span>
+            </span>
+            <button id="auto-cinema" class="switch" role="switch" aria-checked="true"></button>
+          </li>
+          <li>
+            <span id="show-dock-label">Show Peeko in Dock</span>
+            <button id="show-dock" class="switch" role="switch" aria-checked="false"></button>
+          </li>
+          <li>
+            <span id="language-label">Language</span>
+            <select id="language">
+              <option value="system">Auto (System)</option>
+              <option value="zh">中文</option>
+              <option value="en">English</option>
+            </select>
+          </li>
+          <li>
+            <span id="pass-opacity-label">Click-through opacity</span>
+            <span class="range-wrap">
+              <input id="pass-opacity" type="range" min="10" max="90" step="5" />
+              <span id="pass-opacity-val" class="range-val"></span>
+            </span>
+          </li>
+          <li>
+            <span id="replay-intro-label">Replay intro guide</span>
+            <button id="replay-intro" class="text-btn" style="margin-bottom: 0">
+              Replay intro
+            </button>
+          </li>
+        </ul>
+      </section>
+      <section>
+        <div class="sec-head">
+          <h2 id="shortcuts-title">Shortcuts</h2>
+          <button id="reset-shortcuts" class="text-btn">Reset to defaults</button>
+        </div>
+        <ul id="shortcuts"></ul>
+        <p class="hint warn" id="shortcut-warn"></p>
+        <p class="hint" id="shortcut-hint">
+          Click a keycap, then press a new combo with a modifier. Esc cancels.
+        </p>
+      </section>
+      <section>
+        <h2 id="updates-title">Updates</h2>
+        <ul>
+          <li>
+            <span id="updates-current-label">Current version</span>
+            <span id="updates-version" class="version-pill"></span>
+          </li>
+          <li>
+            <span id="updates-status-label">Status</span>
+            <span id="updates-status" class="update-status"></span>
+          </li>
+          <li>
+            <span id="updates-actions-label">Software updates</span>
+            <span class="button-cluster">
+              <button id="updates-check" class="text-btn" style="margin-bottom: 0">
+                Check for Updates
+              </button>
+              <button id="updates-download" class="text-btn" style="margin-bottom: 0">
+                Download Update
+              </button>
+              <button id="updates-install" class="text-btn" style="margin-bottom: 0">
+                Restart & Install
+              </button>
+            </span>
+          </li>
+        </ul>
+        <p class="hint" id="updates-hint"></p>
+      </section>
+      <section>
+        <h2 id="favorites-title">Favorites</h2>
+        <ul id="favorites"></ul>
+        <p class="hint" id="fav-empty">Favorites is empty</p>
+        <p class="hint" id="fav-hint">Click a name to rename it</p>
+      </section>
+      <section>
+        <h2 id="maintenance-title">Maintenance</h2>
+        <ul>
+          <li>
+            <span id="copy-diagnostics-label">Copy diagnostics</span>
+            <button id="copy-diagnostics" class="text-btn" style="margin-bottom: 0">Copy</button>
+          </li>
+          <li>
+            <span id="clear-session-label">Clear browser session</span>
+            <button id="clear-session" class="text-btn" style="margin-bottom: 0">Clear</button>
+          </li>
+          <li>
+            <span id="clear-favorites-label">Clear favorites</span>
+            <button id="clear-favorites" class="text-btn" style="margin-bottom: 0">Clear</button>
+          </li>
+          <li>
+            <span id="reset-preferences-label">Restore preference defaults</span>
+            <button id="reset-preferences" class="text-btn" style="margin-bottom: 0">Reset</button>
+          </li>
+        </ul>
+        <p class="hint" id="maintenance-status"></p>
+      </section>
+    </main>
+    <script type="module" src="./settings.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:"
+    />
+    <link rel="stylesheet" href="./onboarding.css" />
+    <title>Welcome to Peeko</title>
+  </head>
+  <body>
+    <!-- 聚光灯灰纱：浮窗那块挖空突显，洞周加深、大面积减轻（三层景深） -->
+    <div id="scrim"></div>
+    <!-- 灰阶光束（程序化氛围层） -->
+    <div id="rays"><i></i><i></i><i></i><i></i><i></i></div>
+    <button id="skip" hidden>Skip</button>
+
+    <!-- Act 0：权限门，先拿到长按监听所需的辅助功能权限，再进入正式 intro -->
+    <section id="permission-gate" hidden>
+      <div id="permission-card">
+        <p id="permission-step"></p>
+        <h2 id="permission-title"></h2>
+        <div id="permission-icon">⌃X</div>
+        <p id="permission-copy"></p>
+        <div id="permission-actions">
+          <button id="permission-action"></button>
+          <button id="permission-check" hidden></button>
+          <button id="permission-quit" hidden></button>
+        </div>
+        <p id="permission-status"></p>
+      </div>
+    </section>
+
+    <!-- Act 0.5：核心快捷键冲突门，先修好逃生路径，再进入正式 intro -->
+    <section id="shortcut-gate" hidden>
+      <div id="shortcut-card">
+        <p id="shortcut-step"></p>
+        <h2 id="shortcut-title"></h2>
+        <p id="shortcut-copy"></p>
+        <div id="shortcut-list"></div>
+        <div id="shortcut-actions">
+          <button id="shortcut-recommend"></button>
+          <button id="shortcut-settings"></button>
+          <button id="shortcut-quit"></button>
+        </div>
+        <p id="shortcut-status"></p>
+      </div>
+    </section>
+
+    <!-- Act I：logo 呼吸开场 -->
+    <section id="logo-act" hidden>
+      <img id="logo" src="./icon.png" alt="Peeko" draggable="false" />
+    </section>
+
+    <!-- Act I 终：光团爆发 → tagline → 全屏 shine -->
+    <section id="tagline-act" hidden>
+      <div id="orb"></div>
+      <p id="tagline"></p>
+      <div id="shine"></div>
+    </section>
+
+    <!-- Act I.5：快捷键总览——正式闯关前先把所有键一次看完 -->
+    <section id="cheatsheet" hidden>
+      <div id="cheat-card">
+        <h2 id="cheat-title"></h2>
+        <p id="cheat-sub"></p>
+        <div id="cheat-list"></div>
+        <button id="cheat-next"></button>
+      </div>
+    </section>
+
+    <!-- Act II：闯关 -->
+    <section id="challenges" hidden>
+      <div id="card">
+        <p id="card-step"></p>
+        <h2 id="card-title"></h2>
+        <div id="card-keys"></div>
+        <p id="card-hint"></p>
+        <p id="card-fact"></p>
+        <div id="card-legend" hidden></div>
+        <button id="card-action" hidden></button>
+      </div>
+      <div id="dots"></div>
+    </section>
+
+    <!-- Act III：终幕 -->
+    <section id="finale" hidden>
+      <h2 id="finale-title"></h2>
+      <p class="sub"></p>
+      <button id="start">Start watching</button>
+    </section>
+
+    <script type="module" src="./onboarding.ts"></script>
+  </body>
+</html>
