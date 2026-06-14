@@ -6,6 +6,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import { pickRule } from '../src/main/sites/index'
+import { genericRule } from '../src/main/sites/generic'
 
 describe('pickRule', () => {
   it('小红书域名命中精修规则', () => {
@@ -20,5 +21,10 @@ describe('pickRule', () => {
     const xhs = pickRule('https://www.xiaohongshu.com/x')
     expect(xhs.css).toContain('data-peeko-keep')
     expect(xhs.jsOn).toContain('__peekoCinemaOff')
+  })
+  it('兜底规则周期性重选视频，避免广告切正片后锁旧链', () => {
+    expect(genericRule.jsOn).toContain('clearMarks()')
+    expect(genericRule.jsOn).toContain('setInterval(mark, 800)')
+    expect(genericRule.jsOn).toContain('new MutationObserver(scheduleMark)')
   })
 })

@@ -1,0 +1,318 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e3]:
+      - link "Peeko home" [ref=e4] [cursor=pointer]:
+        - /url: "#top"
+        - img [ref=e6]
+        - generic [ref=e11]: peeko
+      - navigation [ref=e12]:
+        - link "Features" [ref=e13] [cursor=pointer]:
+          - /url: "#features"
+        - link "How it works" [ref=e14] [cursor=pointer]:
+          - /url: "#how"
+        - link "Reference" [ref=e15] [cursor=pointer]:
+          - /url: "#controls"
+        - link "Download" [ref=e16] [cursor=pointer]:
+          - /url: "#download"
+  - main [ref=e17]:
+    - generic [ref=e18]:
+      - paragraph [ref=e19]: macOS · Apple Silicon · v0.1.0
+      - heading "peeko" [level=1] [ref=e20]
+      - paragraph [ref=e21]: For the things you're half-watching.
+      - paragraph [ref=e22]:
+        - text: A tiny always-on-top video window with shortcuts
+        - text: for hide, peek, mute, and click-through.
+      - link "Download for Apple Silicon Mac" [ref=e24] [cursor=pointer]:
+        - /url: https://github.com/ZixuanW46/peeko/releases/latest
+        - img [ref=e25]
+        - text: Download for Apple Silicon Mac
+      - generic [ref=e28]:
+        - generic [ref=e29]:
+          - generic [ref=e30]:
+            - img [ref=e31]
+            - generic [ref=e33]: Pages
+            - generic [ref=e34]: File
+            - generic [ref=e35]: Edit
+            - generic [ref=e36]: View
+            - generic [ref=e37]: Insert
+          - generic [ref=e38]:
+            - generic "Peeko" [ref=e39]:
+              - img [ref=e40]
+            - img [ref=e43]
+            - img [ref=e45]
+            - img [ref=e49]
+            - generic [ref=e54]: Tue 9:41
+        - generic [ref=e61]: Q3 Planning.pages
+        - generic [ref=e88]:
+          - img "Live stream in the floating window" [ref=e89]
+          - generic [ref=e90]: LIVE
+          - img [ref=e91]
+          - generic [ref=e93]:
+            - img [ref=e94]
+            - img [ref=e96]
+    - generic [ref=e100]:
+      - generic [ref=e101]:
+        - paragraph [ref=e102]: What it does
+        - heading "Keep listening. Peek when it matters." [level=2] [ref=e103]:
+          - text: Keep listening.
+          - text: Peek when it matters.
+        - paragraph [ref=e104]:
+          - text: A picture-in-picture tool with global shortcuts for macOS.
+          - text: Peeko lets video, audio, and clicks disappear separately.
+      - generic [ref=e105]:
+        - article [ref=e106]:
+          - heading "Hide the picture" [level=3] [ref=e108]
+          - paragraph [ref=e109]: The window disappears while audio keeps playing — nothing to see, still in the game.
+          - generic [ref=e110]:
+            - generic [ref=e111]: Picture · off
+            - generic [ref=e113]: Audio · on
+        - article [ref=e115]:
+          - heading "Mute the sound" [level=3] [ref=e117]
+          - paragraph [ref=e118]: Silence the stream without touching the window — the picture stays right where it is.
+          - generic [ref=e119]:
+            - generic [ref=e120]: Window · on
+            - generic [ref=e122]: Sound · off
+        - article [ref=e124]:
+          - generic [ref=e125]:
+            - generic [ref=e126]:
+              - generic [ref=e127]:
+                - img [ref=e128]
+                - generic [ref=e130]: Pages
+                - generic [ref=e131]: File
+                - generic [ref=e132]: Edit
+                - generic [ref=e133]: View
+                - generic [ref=e134]: Tue 9:41
+              - generic [ref=e140]: Q3 Planning
+            - generic [ref=e147]:
+              - img "Live stream peeking into the corner" [ref=e148]
+              - generic [ref=e149]: LIVE
+            - generic [ref=e150]:
+              - generic [ref=e151]: ⌃
+              - generic [ref=e152]: X
+              - text: hold to peek
+          - generic [ref=e153]:
+            - generic [ref=e155]:
+              - generic [ref=e156]: Hold
+              - generic [ref=e157]: ⌃
+              - generic [ref=e158]: X
+            - heading "Hold to peek" [level=3] [ref=e159]
+            - paragraph [ref=e160]: The picture stays hidden. Hold the shortcut to bring it back just long enough to check the score — release, and it's gone again.
+        - article [ref=e161]:
+          - heading "Vanish everything" [level=3] [ref=e163]
+          - paragraph [ref=e164]: Hide the window, mute the audio, and pause playback in one keystroke — like it was never running.
+          - generic [ref=e165]:
+            - generic [ref=e166]: Picture · off
+            - generic [ref=e168]: Sound · off
+            - generic [ref=e170]: Playback · off
+        - article [ref=e172]:
+          - heading "Click through mode" [level=3] [ref=e174]
+          - paragraph [ref=e175]: Let your mouse pass straight through Peeko to the work underneath — the window stops getting in the way.
+          - generic [ref=e176]:
+            - generic [ref=e177]: Cursor control
+            - generic [ref=e179]: Picture see through
+    - generic [ref=e182]:
+      - generic [ref=e183]:
+        - paragraph [ref=e184]: How it works
+        - heading "Open a video page. Peeko does the rest." [level=2] [ref=e185]:
+          - text: Open a video page.
+          - text: Peeko does the rest.
+        - paragraph [ref=e186]: Browse like normal. Watch like nothing is there.
+      - generic [ref=e187]:
+        - generic [ref=e188]:
+          - generic [ref=e189]: Step 01
+          - generic [ref=e203]:
+            - heading "Open a video page" [level=4] [ref=e204]
+            - paragraph [ref=e205]: Paste a live stream, a show, or any video site into Peeko's mini browser.
+        - generic [ref=e206]:
+          - generic [ref=e207]: Step 02
+          - generic [ref=e218]:
+            - heading "Peeko turns it into a floating window" [level=4] [ref=e219]
+            - paragraph [ref=e220]: It lifts out the main video and drops it into a small, borderless window on top of your work.
+        - generic [ref=e221]:
+          - generic [ref=e222]: Step 03
+          - generic [ref=e231]:
+            - generic [ref=e232]: ⌃
+            - generic [ref=e233]: Z
+          - generic [ref=e234]:
+            - heading "Control picture, sound, and clicks" [level=4] [ref=e235]
+            - paragraph [ref=e236]: Hide the picture, mute the sound, peek, or click through — all from the keyboard.
+    - generic [ref=e238]:
+      - generic [ref=e239]:
+        - paragraph [ref=e240]: Reference
+        - heading "Every control, one glance." [level=2] [ref=e241]
+        - paragraph [ref=e242]:
+          - text: Shortcuts for fast exits.
+          - text: A glass toolbar for everything else.
+      - generic [ref=e243]:
+        - generic [ref=e244]:
+          - generic [ref=e245]:
+            - heading "Keyboard shortcuts" [level=3] [ref=e246]
+            - generic [ref=e247]: global
+          - generic [ref=e248]:
+            - generic [ref=e249]:
+              - generic [ref=e250]:
+                - generic [ref=e251]: Hide picture
+                - paragraph [ref=e252]: Hide the window while audio keeps playing.
+              - generic [ref=e253]:
+                - generic [ref=e254]: ⌃
+                - generic [ref=e255]: Z
+            - generic [ref=e256]:
+              - generic [ref=e257]:
+                - generic [ref=e258]: Peek
+                - paragraph [ref=e259]: Show the picture only while the keys are held.
+              - generic [ref=e260]:
+                - generic [ref=e261]: Hold
+                - generic [ref=e262]: ⌃
+                - generic [ref=e263]: X
+            - generic [ref=e264]:
+              - generic [ref=e265]:
+                - generic [ref=e266]: Vanish everything
+                - paragraph [ref=e267]: Hide, mute, and pause Peeko in one move.
+              - generic [ref=e268]:
+                - generic [ref=e269]: ⌃
+                - generic [ref=e270]: C
+            - generic [ref=e271]:
+              - generic [ref=e272]:
+                - generic [ref=e273]: Play / pause
+                - paragraph [ref=e274]: Control the main video without touching the page.
+              - generic [ref=e275]:
+                - generic [ref=e276]: ⌃
+                - generic [ref=e277]: P
+            - generic [ref=e278]:
+              - generic [ref=e279]:
+                - generic [ref=e280]: Mute sound
+                - paragraph [ref=e281]: Silence or restore the stream.
+              - generic [ref=e282]:
+                - generic [ref=e283]: ⌃
+                - generic [ref=e284]: M
+            - generic [ref=e285]:
+              - generic [ref=e286]:
+                - generic [ref=e287]: Cinema / Browse
+                - paragraph [ref=e288]: Toggle between video-only and full-page browsing.
+              - generic [ref=e289]:
+                - generic [ref=e290]: ⌃
+                - generic [ref=e291]: B
+            - generic [ref=e292]:
+              - generic [ref=e293]:
+                - generic [ref=e294]: Click through
+                - paragraph [ref=e295]: Let mouse clicks pass to the app underneath.
+              - generic [ref=e296]:
+                - generic [ref=e297]: ⌃
+                - generic [ref=e298]: T
+            - generic [ref=e299]:
+              - generic [ref=e300]:
+                - generic [ref=e301]: Fullscreen
+                - paragraph [ref=e302]: Use Peeko like a normal fullscreen player.
+              - generic [ref=e303]:
+                - generic [ref=e304]: ⌃
+                - generic [ref=e305]: ↩
+        - generic [ref=e306]:
+          - generic [ref=e307]:
+            - heading "Floating toolbar" [level=3] [ref=e308]
+            - generic [ref=e309]: on hover
+          - generic [ref=e310]:
+            - generic "Back" [ref=e311]:
+              - img [ref=e312]
+            - generic [ref=e314]:
+              - img [ref=e315]
+              - text: worldcup.live/stream
+            - generic "Favorites" [ref=e318]:
+              - img [ref=e319]
+            - generic "World Cup" [ref=e321]: ⚽
+            - generic "Play / pause" [ref=e322]:
+              - img [ref=e323]
+            - generic "Volume" [ref=e325]:
+              - img [ref=e326]
+            - generic "Cinema / Browse" [ref=e329]:
+              - img [ref=e330]
+            - generic "Click-through" [ref=e333]:
+              - img [ref=e334]
+            - generic "Settings" [ref=e337]:
+              - img [ref=e338]
+            - generic "Hide picture" [ref=e341]:
+              - img [ref=e342]
+          - generic [ref=e345]:
+            - generic [ref=e346]:
+              - img [ref=e348]
+              - generic [ref=e355]:
+                - generic [ref=e356]: Drag handle
+                - generic [ref=e357]: Grab to reposition the floating window.
+            - generic [ref=e358]:
+              - img [ref=e360]
+              - generic [ref=e362]:
+                - generic [ref=e363]: Back
+                - generic [ref=e364]: Return to the last page in the floating browser.
+            - generic [ref=e365]:
+              - img [ref=e367]
+              - generic [ref=e370]:
+                - generic [ref=e371]: URL
+                - generic [ref=e372]: Copy, paste, or type a video page.
+            - generic [ref=e373]:
+              - img [ref=e375]
+              - generic [ref=e377]:
+                - generic [ref=e378]: Favorites
+                - generic [ref=e379]: Save streams or shows for quick return.
+            - generic [ref=e380]:
+              - generic [ref=e381]: ⚽
+              - generic [ref=e382]:
+                - generic [ref=e383]: World Cup
+                - generic [ref=e384]: Open the World Cup live portal.
+            - generic [ref=e385]:
+              - img [ref=e387]
+              - generic [ref=e389]:
+                - generic [ref=e390]: Play / pause
+                - generic [ref=e391]: Play or pause the current video.
+            - generic [ref=e392]:
+              - img [ref=e394]
+              - generic [ref=e397]:
+                - generic [ref=e398]: Volume
+                - generic [ref=e399]: Mute, unmute, or adjust from the hover panel.
+            - generic [ref=e400]:
+              - img [ref=e402]
+              - generic [ref=e405]:
+                - generic [ref=e406]: Cinema / Browse
+                - generic [ref=e407]: Switch between video-only and full page.
+            - generic [ref=e408]:
+              - img [ref=e410]
+              - generic [ref=e413]:
+                - generic [ref=e414]: Click-through
+                - generic [ref=e415]: Let clicks land underneath while Peeko stays visible.
+            - generic [ref=e416]:
+              - img [ref=e418]
+              - generic [ref=e421]:
+                - generic [ref=e422]: Settings
+                - generic [ref=e423]: Change shortcuts, language, Dock, and defaults.
+            - generic [ref=e424]:
+              - img [ref=e426]
+              - generic [ref=e429]:
+                - generic [ref=e430]: Hide picture
+                - generic [ref=e431]: Hide the window while audio keeps playing.
+            - generic [ref=e432]:
+              - img [ref=e434]
+              - generic [ref=e439]:
+                - generic [ref=e440]: Fullscreen
+                - generic [ref=e441]: Enter Peeko fullscreen; Esc exits.
+            - generic [ref=e442]:
+              - img [ref=e444]
+              - generic [ref=e447]:
+                - generic [ref=e448]: Quit
+                - generic [ref=e449]: Close the app from the floating window.
+    - generic [ref=e451]:
+      - heading "Keep working. Keep half-watching." [level=2] [ref=e452]:
+        - text: Keep working.
+        - text: Keep half-watching.
+      - generic [ref=e453]:
+        - link "Download Peeko for Apple Silicon Mac" [ref=e454] [cursor=pointer]:
+          - /url: https://github.com/ZixuanW46/peeko/releases/latest
+          - img [ref=e455]
+          - text: Download Peeko for Apple Silicon Mac
+        - generic [ref=e457]:
+          - generic [ref=e458]: macOS 0.1.0
+          - generic [ref=e459]: Apple Silicon only
+          - generic [ref=e460]: Intel Macs not supported yet
+  - contentinfo [ref=e461]:
+    - generic [ref=e462]:
+      - generic [ref=e463]:
+        - img [ref=e465]
+        - generic [ref=e470]: peeko
+      - generic [ref=e471]: built by zxWill

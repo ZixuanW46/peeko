@@ -35,7 +35,14 @@ export interface UpdateActionState {
   busy: boolean
 }
 
+export interface UpdatePrimaryAction {
+  command: UpdateCommand | null
+  enabled: boolean
+  label: string
+}
+
 const clampProgress = (value: number): number => Math.max(0, Math.min(100, Math.round(value)))
+const progressText = (state: UpdateState): string => `${state.progress ?? 0}%`
 
 export function createInitialUpdateState(currentVersion: string): UpdateState {
   return {
@@ -94,10 +101,56 @@ export function reduceUpdateState(state: UpdateState, event: UpdateEvent): Updat
 export function updateActionState(state: UpdateState): UpdateActionState {
   const busy = state.phase === 'checking' || state.phase === 'downloading'
   return {
-    canCheck: !busy,
+    canCheck: state.phase === 'idle' || state.phase === 'not-available' || state.phase === 'error',
     canDownload: state.phase === 'available',
     canInstall: state.phase === 'downloaded',
     busy
+  }
+}
+
+export function updatePrimaryAction(
+  state: UpdateState,
+  language: UpdateLanguage
+): UpdatePrimaryAction {
+  switch (state.phase) {
+    case 'checking':
+      return {
+        command: null,
+        enabled: false,
+        label: language === 'zh' ? '检查中' : 'Checking'
+      }
+    case 'available':
+      return {
+        command: 'update-download',
+        enabled: true,
+        label: language === 'zh' ? '下载更新' : 'Download Update'
+      }
+    case 'downloading':
+      return {
+        command: null,
+        enabled: false,
+        label:
+          language === 'zh' ? `下载中 ${progressText(state)}` : `Downloading ${progressText(state)}`
+      }
+    case 'downloaded':
+      return {
+        command: 'update-install',
+        enabled: true,
+        label: language === 'zh' ? '重启并安装' : 'Restart & Install'
+      }
+    case 'error':
+      return {
+        command: 'update-check',
+        enabled: true,
+        label: language === 'zh' ? '重新检查' : 'Check Again'
+      }
+    case 'not-available':
+    case 'idle':
+      return {
+        command: 'update-check',
+        enabled: true,
+        label: language === 'zh' ? '检查更新' : 'Check for Updates'
+      }
   }
 }
 
@@ -110,6 +163,25 @@ export function updateTrayCommand(state: UpdateState): UpdateCommand {
 export function updateTrayEnabled(state: UpdateState): boolean {
   const actions = updateActionState(state)
   return actions.canCheck || actions.canDownload || actions.canInstall
+}
+
+export function updateErrorText(error: string | null, language: UpdateLanguage): string {
+  const raw = error?.trim() ?? ''
+  const normalized = raw.toLowerCase()
+  if (!raw) return language === 'zh' ? '更新检查失败' : 'Update check failed'
+  if (/\b404\b/.test(raw) || normalized.includes('not found')) {
+    return language === 'zh' ? '更新源尚未发布' : 'Update feed is not published yet'
+  }
+  if (
+    normalized.includes('enotfound') ||
+    normalized.includes('econnrefused') ||
+    normalized.includes('etimedout') ||
+    normalized.includes('network') ||
+    normalized.includes('internet')
+  ) {
+    return language === 'zh' ? '网络连接失败' : 'Network connection failed'
+  }
+  return raw
 }
 
 export function updateTrayLabel(state: UpdateState, language: UpdateLanguage): string {
@@ -169,7 +241,7 @@ export function updateStatusText(state: UpdateState, language: UpdateLanguage): 
       case 'downloaded':
         return '更新已下载，重启后安装'
       case 'error':
-        return state.error ?? '更新检查失败'
+        return updateErrorText(state.error, language)
     }
   }
   switch (state.phase) {
@@ -186,21 +258,6 @@ export function updateStatusText(state: UpdateState, language: UpdateLanguage): 
     case 'downloaded':
       return 'Update downloaded. Restart to install.'
     case 'error':
-      return state.error ?? 'Update check failed'
+      return updateErrorText(state.error, language)
   }
-}
-
-export function updateCheckButtonText(state: UpdateState, language: UpdateLanguage): string {
-  if (language === 'zh') return state.phase === 'checking' ? '检查中' : '检查更新'
-  return state.phase === 'checking' ? 'Checking' : 'Check for Updates'
-}
-
-export function updateDownloadButtonText(state: UpdateState, language: UpdateLanguage): string {
-  const progress = state.progress ?? 0
-  if (language === 'zh') return state.phase === 'downloading' ? `下载中 ${progress}%` : '下载更新'
-  return state.phase === 'downloading' ? `Downloading ${progress}%` : 'Download Update'
-}
-
-export function updateInstallButtonText(_state: UpdateState, language: UpdateLanguage): string {
-  return language === 'zh' ? '重启并安装' : 'Restart & Install'
 }

@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 依赖 preload/ui.ts 暴露的 window.peeko 桥
- * [OUTPUT]: 设置窗逻辑——自动观影开关、改键录制器（含重置）、收藏管理（重命名/删除/看网址）
+ * [OUTPUT]: 设置窗逻辑——自动观影、更新单主动作+下载浮层、改键录制、收藏管理
  * [POS]: renderer/settings 的逻辑层
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -12,11 +12,9 @@ import {
 } from '../../shared/i18n'
 import { prettyShortcut } from '../../shared/shortcuts'
 import {
-  updateActionState,
-  updateCheckButtonText,
-  updateDownloadButtonText,
-  updateInstallButtonText,
+  updatePrimaryAction,
   updateStatusText,
+  type UpdateCommand,
   type UpdateState
 } from '../../shared/updater'
 
@@ -89,6 +87,8 @@ const $ = <T extends HTMLElement = HTMLElement>(id: string): T => document.getEl
 
 let language: ResolvedLanguage = 'en'
 let currentUpdateState: UpdateState | null = null
+let updateDialogArmed = false
+let updateDialogDismissed = false
 const t = (en: string, zh: string): string => tx(language, en, zh)
 
 function applyLanguage(next: LanguageSettings): void {
@@ -151,13 +151,6 @@ function applyStaticCopy(): void {
   setText('updates-current-label', t('Current version', '当前版本'))
   setText('updates-status-label', t('Status', '状态'))
   setText('updates-actions-label', t('Software updates', '软件更新'))
-  setText(
-    'updates-hint',
-    t(
-      'Peeko checks quietly once a day. Manual checks never download until you choose it.',
-      'Peeko 每天静默检查一次；手动检查发现新版后，也会等你确认再下载。'
-    )
-  )
   setText('favorites-title', t('Favorites', '收藏'))
   setText('fav-empty', t('Favorites is empty', '当前收藏夹为空'))
   setText('fav-hint', t('Click a name to rename it', '点击名称可重命名'))
@@ -179,32 +172,93 @@ function applyStaticCopy(): void {
 
 const pretty = prettyShortcut
 
+function updateProgress(state: UpdateState): number {
+  return state.phase === 'downloaded' ? 100 : (state.progress ?? 0)
+}
+
+function renderUpdateDialog(state: UpdateState): void {
+  const dialog = $('update-dialog')
+  const visible =
+    updateDialogArmed &&
+    !updateDialogDismissed &&
+    (state.phase === 'downloading' || state.phase === 'downloaded')
+  dialog.hidden = !visible
+  if (!visible) return
+
+  const progress = updateProgress(state)
+  const version = state.latestVersion ?? state.currentVersion
+  const ready = state.phase === 'downloaded'
+  $('update-dialog-close').setAttribute('aria-label', t('Close', '关闭'))
+  setText(
+    'update-dialog-title',
+    ready ? t('Update ready', '更新已就绪') : t('Downloading update', '正在下载更新')
+  )
+  setText(
+    'update-dialog-body',
+    ready
+      ? t(`Peeko ${version} has been downloaded.`, `Peeko ${version} 已下载完成。`)
+      : t(`Downloading Peeko ${version}.`, `正在下载 Peeko ${version}。`)
+  )
+  ;($('update-progress-bar') as HTMLSpanElement).style.width = `${progress}%`
+  setText('update-progress-label', `${progress}%`)
+  setText('update-dialog-later', ready ? t('Later', '稍后') : t('Hide', '隐藏'))
+  setText('update-dialog-install', t('Restart & Install', '重启并安装'))
+  ;($('update-dialog-install') as HTMLButtonElement).hidden = !ready
+}
+
 function renderUpdate(state: UpdateState): void {
+  const previous = currentUpdateState
   currentUpdateState = state
-  const actions = updateActionState(state)
-  const check = $('updates-check') as HTMLButtonElement
-  const download = $('updates-download') as HTMLButtonElement
-  const install = $('updates-install') as HTMLButtonElement
+  if (state.phase === 'downloading' && previous?.phase !== 'downloading') {
+    updateDialogArmed = true
+    updateDialogDismissed = false
+  }
+  if (state.phase !== 'downloading' && state.phase !== 'downloaded') {
+    updateDialogArmed = false
+    updateDialogDismissed = false
+  }
+
+  const action = updatePrimaryAction(state, language)
+  const button = $('updates-action') as HTMLButtonElement
   $('updates-version').textContent = state.currentVersion
   $('updates-status').textContent = updateStatusText(state, language)
-  check.textContent = updateCheckButtonText(state, language)
-  download.textContent = updateDownloadButtonText(state, language)
-  install.textContent = updateInstallButtonText(state, language)
-  check.disabled = !actions.canCheck
-  download.disabled = !actions.canDownload
-  install.disabled = !actions.canInstall
+  button.textContent = action.label
+  button.disabled = !action.enabled
+  button.dataset.command = action.command ?? ''
+  renderUpdateDialog(state)
+}
+
+async function runUpdateCommand(command: UpdateCommand | null): Promise<void> {
+  if (!command) return
+  if (command === 'update-check') {
+    renderUpdate(await peeko.checkForUpdates())
+    return
+  }
+  if (command === 'update-download') {
+    if (currentUpdateState) {
+      renderUpdate({ ...currentUpdateState, phase: 'downloading', progress: 0, error: null })
+    }
+    renderUpdate(await peeko.downloadUpdate())
+    return
+  }
+  renderUpdate(await peeko.installUpdate())
+}
+
+function dismissUpdateDialog(): void {
+  updateDialogDismissed = true
+  $('update-dialog').hidden = true
 }
 
 async function initUpdates(): Promise<void> {
   renderUpdate(await peeko.getUpdateState())
   peeko.onUpdateState(renderUpdate)
-  $('updates-check').addEventListener('click', async () =>
-    renderUpdate(await peeko.checkForUpdates())
-  )
-  $('updates-download').addEventListener('click', async () =>
-    renderUpdate(await peeko.downloadUpdate())
-  )
-  $('updates-install').addEventListener('click', async () =>
+  $('updates-action').addEventListener('click', async () => {
+    const action = updatePrimaryAction(currentUpdateState!, language)
+    await runUpdateCommand(action.command)
+  })
+  $('update-dialog-close').addEventListener('click', dismissUpdateDialog)
+  $('update-dialog-later').addEventListener('click', dismissUpdateDialog)
+  $('update-dialog-install').addEventListener('click', async () =>
     renderUpdate(await peeko.installUpdate())
   )
 }

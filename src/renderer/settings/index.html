@@ -82,19 +82,12 @@
           <li>
             <span id="updates-actions-label">Software updates</span>
             <span class="button-cluster">
-              <button id="updates-check" class="text-btn" style="margin-bottom: 0">
+              <button id="updates-action" class="text-btn" style="margin-bottom: 0">
                 Check for Updates
-              </button>
-              <button id="updates-download" class="text-btn" style="margin-bottom: 0">
-                Download Update
-              </button>
-              <button id="updates-install" class="text-btn" style="margin-bottom: 0">
-                Restart & Install
               </button>
             </span>
           </li>
         </ul>
-        <p class="hint" id="updates-hint"></p>
       </section>
       <section>
         <h2 id="favorites-title">Favorites</h2>
@@ -125,6 +118,30 @@
         <p class="hint" id="maintenance-status"></p>
       </section>
     </main>
+    <div id="update-dialog" class="update-overlay" hidden>
+      <section
+        class="update-sheet"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="update-dialog-title"
+      >
+        <button id="update-dialog-close" class="update-close" type="button" aria-label="Close">
+          ×
+        </button>
+        <h3 id="update-dialog-title">Downloading update</h3>
+        <p id="update-dialog-body"></p>
+        <div class="update-progress" aria-hidden="true">
+          <span id="update-progress-bar"></span>
+        </div>
+        <span id="update-progress-label" class="update-progress-label">0%</span>
+        <div class="update-dialog-actions">
+          <button id="update-dialog-later" class="text-btn" type="button">Later</button>
+          <button id="update-dialog-install" class="text-btn" type="button">
+            Restart & Install
+          </button>
+        </div>
+      </section>
+    </div>
     <script type="module" src="./settings.ts"></script>
   </body>
 </html>

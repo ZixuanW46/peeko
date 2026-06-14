@@ -3,7 +3,6 @@ productName: Peeko
 directories:
   buildResources: build
 files:
-  - '!**/.vscode/*'
   - '!src/*'
   - '!electron.vite.config.{js,ts,mjs,cjs}'
   - '!{.eslintcache,eslint.config.mjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
@@ -12,13 +11,6 @@ files:
 asarUnpack:
   - resources/**
   - node_modules/uiohook-napi/**
-win:
-  executableName: Peeko
-nsis:
-  artifactName: ${name}-${version}-setup.${ext}
-  shortcutName: ${productName}
-  uninstallDisplayName: ${productName}
-  createDesktopShortcut: always
 afterSign: scripts/adhoc-sign.mjs
 mac:
   hardenedRuntime: true
@@ -33,15 +25,6 @@ mac:
   extendInfo:
     LSUIElement: true # 菜单栏附件应用：无 Dock 图标
 dmg:
-  artifactName: ${name}-${version}.${ext}
-linux:
-  target:
-    - AppImage
-    - snap
-    - deb
-  maintainer: electronjs.org
-  category: Utility
-appImage:
   artifactName: ${name}-${version}.${ext}
 npmRebuild: false
 publish:

@@ -278,7 +278,16 @@ li:last-child {
     ui-monospace,
     monospace;
   text-align: right;
+}
+
+.version-pill {
   white-space: nowrap;
+}
+
+.update-status {
+  max-width: 280px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
 }
 
 .button-cluster {
@@ -289,14 +298,125 @@ li:last-child {
   flex-wrap: wrap;
 }
 
+.text-btn:disabled,
 .button-cluster .text-btn:disabled {
   color: var(--tertiary);
   cursor: default;
 }
 
+.text-btn:disabled:hover,
 .button-cluster .text-btn:disabled:hover {
   background: transparent;
   color: var(--tertiary);
+}
+
+.update-overlay[hidden] {
+  display: none;
+}
+
+.update-overlay {
+  -webkit-app-region: no-drag;
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.update-sheet {
+  position: relative;
+  width: min(340px, 100%);
+  padding: 18px;
+  border-radius: 8px;
+  background: var(--tooltip-bg);
+  box-shadow:
+    inset 0 0 0 0.5px var(--separator),
+    0 18px 50px rgba(0, 0, 0, 0.22);
+}
+
+.update-sheet h3 {
+  margin: 0 28px 6px 0;
+  color: var(--label);
+  font:
+    13px -apple-system,
+    'PingFang SC',
+    sans-serif;
+  font-weight: 600;
+}
+
+.update-sheet p {
+  min-height: 18px;
+  margin: 0 0 14px;
+  color: var(--secondary);
+  font:
+    12px -apple-system,
+    'PingFang SC',
+    sans-serif;
+  line-height: 1.4;
+}
+
+.update-close {
+  -webkit-app-region: no-drag;
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--tertiary);
+  cursor: pointer;
+  font:
+    16px -apple-system,
+    'PingFang SC',
+    sans-serif;
+  line-height: 20px;
+}
+
+.update-close:hover {
+  background: var(--hover);
+  color: var(--label);
+}
+
+.update-progress {
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--capsule);
+}
+
+.update-progress span {
+  display: block;
+  width: 0%;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--switch-on);
+  transition: width 0.16s ease-out;
+}
+
+.update-progress-label {
+  display: block;
+  margin-top: 7px;
+  color: var(--secondary);
+  font:
+    11px 'SF Mono',
+    ui-monospace,
+    monospace;
+  text-align: right;
+}
+
+.update-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.update-dialog-actions .text-btn {
+  margin-bottom: 0;
 }
 
 select {

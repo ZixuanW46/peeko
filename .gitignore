@@ -21,10 +21,6 @@ dist/
 .gemini/
 skills-lock.json
 
-# 临时设计草稿与截图对照导出图
-landing/
-peeko-logo-hd*-screenshot-match.png
-
 # 内部产品/设计过程文档，不进入公开仓库
 PRODUCT.md
 DESIGN.md

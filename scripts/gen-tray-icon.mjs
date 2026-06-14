@@ -1,111 +1,70 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type */
 /**
- * [INPUT]: 依赖 node:zlib / node:fs（零外部依赖）
- * [OUTPUT]: 生成 resources/trayTemplate.png 与 @2x——Peeko 菜单栏模板图标
- * [POS]: scripts 的资产生成器，logo 母题（外框+叠卡）的菜单栏转译
+ * [INPUT]: 依赖 lib/raster.mjs 的 writePng/sdRoundRect/coverage/clamp01 与 lib/mark.mjs 的 PEEKO_MARK/toRect
+ * [OUTPUT]: resources/trayTemplate.svg（白色源）+ trayTemplate.png(+@2x)——Peeko 菜单栏图标
+ * [POS]: scripts 的菜单栏图标生成器，pixel-dissolve logo（与 App 图标同一几何）的菜单栏转译
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  *
- * 设计：纯黑 + 透明度分层（macOS template image 规范）。
- *   外层圆角方框：线条，alpha 1.0
- *   右下叠卡：圆角实心，alpha 0.45（透明度做层次，参考系统图标语言）
- *   叠卡内两条短横线：镂空（alpha 0）
+ * 与 App 图标"长一样"：直接用 PEEKO_MARK 完整六块，不再自创紧凑变体。
+ * 菜单栏图标不必方形——做成贴合 mark 的宽形（整体略小于满高，避免占位过宽），mark 完整展开且各块清晰。
+ *
+ * 颜色：按设计画白色 + 透明度分层（block 纯白、像素渐隐成不同灰白）。trayTemplate 仍由
+ *   tray.ts setTemplateImage(true) 标记为模板图——系统忽略 RGB、仅用 alpha 着色（深色栏白、
+ *   浅色栏黑），故白/黑等效；画白只为直观，并让非模板回退时深色栏仍可读。
  */
-import { deflateSync } from 'node:zlib'
+import { writePng, sdRoundRect, coverage, clamp01 } from './lib/raster.mjs'
+import { PEEKO_MARK, toRect, markBounds } from './lib/mark.mjs'
 import { writeFileSync, mkdirSync } from 'node:fs'
 
-// ---------- 最小 PNG 编码器（RGBA → PNG） ----------
-function crc32(buf) {
-  let c
-  const table = []
-  for (let n = 0; n < 256; n++) {
-    c = n
-    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1
-    table[n] = c >>> 0
-  }
-  let crc = 0xffffffff
-  for (const b of buf) crc = table[(crc ^ b) & 0xff] ^ (crc >>> 8)
-  return (crc ^ 0xffffffff) >>> 0
-}
+const rects = PEEKO_MARK.map(toRect)
 
-function chunk(type, data) {
-  const len = Buffer.alloc(4)
-  len.writeUInt32BE(data.length)
-  const body = Buffer.concat([Buffer.from(type), data])
-  const crc = Buffer.alloc(4)
-  crc.writeUInt32BE(crc32(body))
-  return Buffer.concat([len, body, crc])
-}
+// ---------- viewBox：贴合 mark 内容 + padding（64 空间单位，与 favicon 共用 markBounds） ----------
+const { x: vbX, y: vbY, w: vbW, h: vbH } = markBounds(3)
 
-function encodePng(width, height, rgba) {
-  const ihdr = Buffer.alloc(13)
-  ihdr.writeUInt32BE(width, 0)
-  ihdr.writeUInt32BE(height, 4)
-  ihdr[8] = 8 // bit depth
-  ihdr[9] = 6 // RGBA
-  const raw = Buffer.alloc((width * 4 + 1) * height)
-  for (let y = 0; y < height; y++) {
-    raw[y * (width * 4 + 1)] = 0 // filter: none
-    rgba.copy(raw, y * (width * 4 + 1) + 1, y * width * 4, (y + 1) * width * 4)
-  }
-  return Buffer.concat([
-    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
-    chunk('IHDR', ihdr),
-    chunk('IDAT', deflateSync(raw, { level: 9 })),
-    chunk('IEND', Buffer.alloc(0))
-  ])
-}
+// ---------- SDF 渲染：白色 RGB + alpha=覆盖率×透明度 ----------
+function draw(W, H) {
+  const rgba = Buffer.alloc(W * H * 4)
+  const sx = W / vbW
+  const sy = H / vbH
+  const s = (sx + sy) / 2 // 把 64 空间的 SDF 距离换算到像素（用于 1px 软边）
 
-// ---------- SDF 几何：圆角矩形 ----------
-const sdRoundRect = (px, py, cx, cy, hw, hh, r) => {
-  const qx = Math.abs(px - cx) - (hw - r)
-  const qy = Math.abs(py - cy) - (hh - r)
-  return Math.min(Math.max(qx, qy), 0) + Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) - r
-}
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const mx = vbX + (x + 0.5) / sx
+      const my = vbY + (y + 0.5) / sy
 
-const clamp01 = (v) => Math.min(1, Math.max(0, v))
-// 1px 软边：SDF → 覆盖率
-const coverage = (d) => clamp01(0.5 - d)
+      // 六块取最大覆盖（无重叠，max==over）；alpha = 覆盖率 × 该块透明度
+      let a = 0
+      for (const rc of rects) {
+        const d = sdRoundRect(mx, my, rc.cx, rc.cy, rc.hw, rc.hh, rc.r)
+        const c = coverage(d * s) * rc.op
+        if (c > a) a = c
+      }
 
-// ---------- 绘制（坐标按 18pt 设计，scale 放大） ----------
-function draw(size, scale) {
-  const rgba = Buffer.alloc(size * size * 4)
-  const S = (v) => v * scale
-
-  // 外框：中心 (8,8)，半宽高 6.5，圆角 2.2，线宽 1.5
-  // 叠卡：中心 (12.2,12.2)，半宽高 4.2，圆角 1.6，实心 45%
-  // 卡内横线：两条 1.1 高、4.4 宽的镂空圆角条
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const px = x + 0.5
-      const py = y + 0.5
-
-      const dFrame = sdRoundRect(px, py, S(8), S(8), S(6.5), S(6.5), S(2.2))
-      const frameStroke = coverage(Math.abs(dFrame) - S(0.75))
-
-      const dCard = sdRoundRect(px, py, S(12.2), S(12.2), S(4.2), S(4.2), S(1.6))
-      const cardFill = coverage(dCard)
-
-      const dLine1 = sdRoundRect(px, py, S(12.2), S(10.9), S(2.2), S(0.55), S(0.55))
-      const dLine2 = sdRoundRect(px, py, S(12.2), S(13.5), S(2.2), S(0.55), S(0.55))
-      const lineCut = Math.max(coverage(dLine1), coverage(dLine2))
-
-      // 叠卡区域内禁止外框线穿透（卡片"叠"在框上）+ 横线镂空
-      const cardGuard = coverage(dCard - S(0.9)) // 卡片外扩一圈遮挡外框
-      const frameA = frameStroke * (1 - cardGuard)
-      const cardA = cardFill * 0.45 * (1 - lineCut)
-
-      const alpha = clamp01(frameA + cardA)
-      const i = (y * size + x) * 4
-      rgba[i] = 0
-      rgba[i + 1] = 0
-      rgba[i + 2] = 0
-      rgba[i + 3] = Math.round(alpha * 255)
+      const i = (y * W + x) * 4
+      rgba[i] = 255 // 白
+      rgba[i + 1] = 255
+      rgba[i + 2] = 255
+      rgba[i + 3] = Math.round(clamp01(a) * 255)
     }
   }
-  return encodePng(size, size, rgba)
+  return rgba
 }
 
+// ---------- SVG 源：白 fill + opacity 分层（人类可编辑的真相相） ----------
+function svg() {
+  const r = (m) =>
+    `  <rect x="${m.x}" y="${m.y}" width="${m.w}" height="${m.h}" rx="${m.r}" fill="#ffffff" opacity="${m.op}"/>`
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vbX} ${vbY} ${vbW} ${vbH}" fill="none">\n${PEEKO_MARK.map(r).join('\n')}\n</svg>\n`
+}
+
+// ---------- 产出（整体高度 H，宽度按 mark 比例自适应） ----------
+// 整体高度（< 菜单栏满高 18，避免宽形 mark 占位过宽、显得比邻居大）；改这一个数即可整体缩放
+const H = 14
+const W = Math.round((vbW / vbH) * H)
+
 mkdirSync('resources', { recursive: true })
-writeFileSync('resources/trayTemplate.png', draw(18, 1))
-writeFileSync('resources/trayTemplate@2x.png', draw(36, 2))
-console.log('生成完成: resources/trayTemplate.png (+@2x)')
+writeFileSync('resources/trayTemplate.svg', svg())
+writePng('resources/trayTemplate.png', W, H, draw(W, H))
+writePng('resources/trayTemplate@2x.png', W * 2, H * 2, draw(W * 2, H * 2))
+console.log(`生成完成: resources/trayTemplate.svg + .png(${W}×${H}) + @2x(${W * 2}×${H * 2})`)

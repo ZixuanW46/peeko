@@ -7,9 +7,9 @@
 import type { SiteRule } from './index'
 
 // ============================================================
-// 算法：找最大就绪视频 → 祖先链标记 data-peeko-keep →
-//       CSS 隐藏链上每层的未标记兄弟 → 视频 fixed 铺满。
-// MutationObserver 守护 SPA 重渲染，jsOff 全量撤销。
+// 算法：周期性撤销旧链 → 重新测量最大就绪视频 → 祖先链标记 data-peeko-keep。
+// 先撤再量是关键：广告结束后，真正视频常被旧广告保留链的 CSS 隐藏，
+// 不把特殊情况消掉，新视频永远没有资格被选中。
 // ============================================================
 const CSS = `
 /* [data-peeko-badge] 是 preload 的状态徽章子树，所有净化规则不得触碰 */
@@ -36,38 +36,52 @@ html, body { background: #000 !important; overflow: hidden !important; }
 
 const JS_ON = `(() => {
   if (window.__peekoCinemaOff) return
-  const mark = () => {
-    const v = [...document.querySelectorAll('video')]
-      .filter(x => x.readyState > 0 && x.getBoundingClientRect().width > 0)
-      .sort((a, b) => {
-        const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect()
-        return rb.width * rb.height - ra.width * ra.height
-      })[0]
-    if (!v) return
-    document.querySelectorAll('[data-peeko-keep],[data-peeko-video],[data-moyu-keep],[data-moyu-video]').forEach(n => {
-      if (n !== v && !n.contains(v)) {
-        n.removeAttribute('data-peeko-keep')
-        n.removeAttribute('data-peeko-video')
-        n.removeAttribute('data-moyu-keep')
-        n.removeAttribute('data-moyu-video')
-      }
-    })
-    v.setAttribute('data-peeko-video', '')
-    for (let n = v.parentElement; n; n = n.parentElement) n.setAttribute('data-peeko-keep', '')
-  }
-  mark()
-  const mo = new MutationObserver(() => {
-    if (!document.querySelector('video[data-peeko-video]')) mark()
-  })
-  mo.observe(document.body, { childList: true, subtree: true })
-  window.__peekoCinemaOff = () => {
-    mo.disconnect()
-    document.querySelectorAll('[data-peeko-keep],[data-peeko-video],[data-moyu-keep],[data-moyu-video]').forEach(n => {
+  const TAGS = '[data-peeko-keep],[data-peeko-video],[data-moyu-keep],[data-moyu-video]'
+  const clearMarks = () => {
+    document.querySelectorAll(TAGS).forEach(n => {
       n.removeAttribute('data-peeko-keep')
       n.removeAttribute('data-peeko-video')
       n.removeAttribute('data-moyu-keep')
       n.removeAttribute('data-moyu-video')
     })
+  }
+  const area = (v) => {
+    const r = v.getBoundingClientRect()
+    return r.width * r.height
+  }
+  const candidate = (v) => {
+    const r = v.getBoundingClientRect()
+    const s = getComputedStyle(v)
+    return v.isConnected && v.readyState > 0 && r.width > 0 && r.height > 0 &&
+      s.display !== 'none' && s.visibility !== 'hidden'
+  }
+  const mark = () => {
+    const previous = document.querySelector('video[data-peeko-video]')
+    clearMarks()
+    const v = [...document.querySelectorAll('video')]
+      .filter(candidate)
+      .sort((a, b) => area(b) - area(a))[0] || (previous?.isConnected ? previous : null)
+    if (!v) return clearMarks()
+    v.setAttribute('data-peeko-video', '')
+    for (let n = v.parentElement; n; n = n.parentElement) n.setAttribute('data-peeko-keep', '')
+  }
+  let pending = 0
+  const scheduleMark = () => {
+    if (pending) return
+    pending = window.setTimeout(() => {
+      pending = 0
+      mark()
+    }, 80)
+  }
+  mark()
+  const timer = window.setInterval(mark, 800)
+  const mo = new MutationObserver(scheduleMark)
+  mo.observe(document.body, { childList: true, subtree: true })
+  window.__peekoCinemaOff = () => {
+    window.clearInterval(timer)
+    if (pending) window.clearTimeout(pending)
+    mo.disconnect()
+    clearMarks()
     delete window.__peekoCinemaOff
   }
 })()`

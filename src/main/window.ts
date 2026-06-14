@@ -113,8 +113,9 @@ export function setBarHover(hovering: boolean): void {
 }
 
 // 输入网址期间降到 floating 层（仍盖普通窗口），让输入法候选窗浮上来；
-// 结束输入立刻回 screen-saver 层恢复盖全屏能力
+// 网页输入框同走这条路；结束输入立刻回 screen-saver 层恢复盖全屏能力
 export function setEditingLevel(editing: boolean): void {
+  if (fullscreen) return
   float?.win.setAlwaysOnTop(true, editing ? 'floating' : 'screen-saver')
 }
 

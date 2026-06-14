@@ -40,6 +40,7 @@ ipcRenderer.on('i18n:language', (_e, next: LanguageSettings) => applyLanguage(ne
 let dragging = false
 let pendingDrag: { x: number; y: number } | null = null
 let didDrag = false // 拖完吞掉随后的合成 click，防止误触播放器的点击切换
+let tapTimer: ReturnType<typeof setTimeout> | null = null // 观影单击播放的去抖定时器（与双击返回浏览区分）
 
 function isOwnUi(t: EventTarget | null): boolean {
   return t instanceof Element && t.closest('[data-peeko-badge]') !== null
@@ -52,8 +53,9 @@ function trusted(e: Event): boolean {
 window.addEventListener(
   'mousedown',
   (e) => {
-    if (!trusted(e) || e.button !== 0 || isOwnUi(e.target)) return
-    didDrag = false // 新一轮按下，恢复正常点击
+    if (!trusted(e) || e.button !== 0) return
+    didDrag = false // 每次左键按下都重置——含点自身 UI（退出叉/工具条）：否则上一轮拖拽残留的 didDrag 会让全局 click 拦截器吞掉本次点击
+    if (isOwnUi(e.target)) return
     if (e.altKey) {
       dragging = true
       didDrag = true
@@ -92,6 +94,18 @@ window.addEventListener(
     if (didDrag) {
       e.preventDefault()
       e.stopImmediatePropagation()
+      return
+    }
+    // 观影模式：单击画面 = 播放/暂停，由 Peeko 接管（站点播放器在首启未激活时点击失灵）。
+    // 拦截不让站点收到（避免双重切换）；250ms 去抖与"双击返回浏览"区分——双击时由 dblclick 取消。
+    if (cinema && trusted(e) && !isOwnUi(e.target)) {
+      e.preventDefault()
+      e.stopImmediatePropagation()
+      if (tapTimer) clearTimeout(tapTimer)
+      tapTimer = setTimeout(() => {
+        tapTimer = null
+        ipcRenderer.send('ctrl:playpause')
+      }, 250)
     }
   },
   true
@@ -116,6 +130,10 @@ window.addEventListener('blur', () => {
 window.addEventListener(
   'dblclick',
   (e) => {
+    if (tapTimer) {
+      clearTimeout(tapTimer) // 双击：撤销第一击挂起的单击播放，避免"切播放 + 返回浏览"双重动作
+      tapTimer = null
+    }
     if (
       shouldForwardPageDoubleClick({
         trusted: trusted(e),
@@ -159,6 +177,69 @@ window.addEventListener(
       e.preventDefault()
       e.stopImmediatePropagation()
     }
+  },
+  true
+)
+
+// ============================================================
+// 核心 3.1：网页输入法让位。
+// screen-saver 窗口层级会压住 macOS 输入法候选窗；只要焦点落在网页可编辑区域，
+// 就临时降到 floating。输入事件仍归网页，Peeko 只调整窗口层级。
+// ============================================================
+function isEditableElement(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) return false
+  if (target.closest('[data-peeko-badge]')) return false
+  if (target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement) return true
+  if (target instanceof HTMLInputElement) {
+    return ![
+      'button',
+      'checkbox',
+      'color',
+      'file',
+      'hidden',
+      'image',
+      'radio',
+      'range',
+      'reset',
+      'submit'
+    ].includes(target.type)
+  }
+  const editable = target.closest('[contenteditable]')
+  return editable !== null && editable.getAttribute('contenteditable') !== 'false'
+}
+
+function hasEditableFocus(): boolean {
+  const active = document.activeElement
+  return isEditableElement(active)
+}
+
+function hasEditableTarget(e: Event): boolean {
+  return e.composedPath().some((target) => isEditableElement(target))
+}
+
+function syncPageEditing(target: EventTarget | null = null): void {
+  ipcRenderer.send('bar:editing', isEditableElement(target) || hasEditableFocus())
+}
+
+window.addEventListener('focusin', (e) => syncPageEditing(e.target), true)
+window.addEventListener(
+  'focusout',
+  () => {
+    setTimeout(syncPageEditing, 0)
+  },
+  true
+)
+window.addEventListener(
+  'compositionstart',
+  (e) => {
+    if (hasEditableTarget(e)) ipcRenderer.send('bar:editing', true)
+  },
+  true
+)
+window.addEventListener(
+  'compositionend',
+  () => {
+    setTimeout(syncPageEditing, 0)
   },
   true
 )
@@ -352,7 +433,7 @@ const toast = ((): HTMLElement | null => {
   try {
     const pill = el(
       'div',
-      `position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);
+      `position: fixed; left: 14px; top: 14px;
        padding: 6px 14px; border-radius: 99px; ${GLASS}
        color: rgba(255,255,255,.85); font: 12px -apple-system, 'PingFang SC', sans-serif;
        white-space: nowrap;
@@ -599,7 +680,7 @@ const bar = ((): Bar | null => {
     const pill = el(
       'div',
       `position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%);
-       width: 344px; box-sizing: border-box;
+       width: fit-content; box-sizing: border-box;
        padding: 4px 8px; border-radius: 99px; ${GLASS}
        z-index: 2147483647; opacity: 0;
        transition: opacity .2s ease-out, box-shadow .25s ease-out;
@@ -678,7 +759,7 @@ const bar = ((): Bar | null => {
     // 网址输入态：预填当前地址并全选——⌘C 即复制，⌘V+回车即加载，打字即手输
     const urlInput = document.createElement('input')
     urlInput.style.cssText = `
-      display: none; width: 100%; border: 0; outline: 0; border-radius: 6px;
+      display: none; width: 320px; max-width: 76vw; border: 0; outline: 0; border-radius: 6px;
       background: rgba(255,255,255,.12); color: rgba(255,255,255,.9);
       font: 12px 'SF Mono', ui-monospace, monospace; padding: 5px 9px;
     `

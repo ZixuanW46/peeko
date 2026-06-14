@@ -6,14 +6,9 @@
  * [POS]: scripts 的正式 macOS 发布入口；避免未验收或未绑定源码版本的 DMG 被直接发布
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
-import { createHash } from 'node:crypto'
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import { spawnSync } from 'node:child_process'
-import { createRequire } from 'node:module'
-
-const require = createRequire(import.meta.url)
-const yaml = require('js-yaml')
 
 const root = process.cwd()
 const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
@@ -28,9 +23,6 @@ const app = join(dist, 'mac-arm64', `${productName}.app`)
 const dmg = join(dist, `${packageName}-${version}.dmg`)
 const zip = join(dist, `${productName}-${version}-arm64-mac.zip`)
 const latest = join(dist, 'latest-mac.yml')
-const identity =
-  process.env.PEEKO_CODESIGN_IDENTITY ?? 'Developer ID Application: Zixuan Wang (GTJ255A5JG)'
-const profile = process.env.APPLE_KEYCHAIN_PROFILE ?? 'peeko-notary'
 const releaseBranch = process.env.PEEKO_RELEASE_BRANCH ?? 'public'
 const allowDirty = process.env.PEEKO_RELEASE_ALLOW_DIRTY === '1'
 const allowBranch = process.env.PEEKO_RELEASE_ALLOW_BRANCH === '1'
@@ -64,10 +56,6 @@ function shortOutput(text, maxLines = 40) {
   return `${shown}${more}`
 }
 
-function sha512(file) {
-  return createHash('sha512').update(readFileSync(file)).digest('base64')
-}
-
 function releaseAssets() {
   return [dmg, `${dmg}.blockmap`, zip, `${zip}.blockmap`, latest].filter(existsSync)
 }
@@ -92,7 +80,7 @@ function assertReleaseBranch() {
       [
         `Release must run from ${releaseBranch}.`,
         `Current branch: ${branch || '(detached HEAD)'}`,
-        `Run npm run public:snapshot first, then release from the ${releaseBranch} worktree.`
+        `Update the public worktree from dev first, then release from the ${releaseBranch} worktree.`
       ].join('\n')
     )
   }
@@ -125,20 +113,6 @@ function assertGitHubTarget() {
   }
   run('gh', ['auth', 'status'], { quiet: true })
   run('gh', ['repo', 'view', repo, '--json', 'nameWithOwner'], { quiet: true })
-}
-
-function refreshLatestMetadata() {
-  assertFile(latest)
-  const doc = yaml.load(readFileSync(latest, 'utf8'))
-  for (const file of doc.files ?? []) {
-    const artifact = join(dist, file.url)
-    if (!existsSync(artifact)) continue
-    const bytes = readFileSync(artifact)
-    file.sha512 = createHash('sha512').update(bytes).digest('base64')
-    file.size = bytes.length
-  }
-  if (doc.path) doc.sha512 = sha512(join(dist, doc.path))
-  writeFileSync(latest, yaml.dump(doc, { lineWidth: 120 }), 'utf8')
 }
 
 function ensureReleaseTag() {
@@ -196,24 +170,12 @@ assertReleaseBranch()
 assertCleanSource()
 assertGitHubTarget()
 
-run('npm', ['run', 'build'])
-run('npx', ['electron-builder', '--mac', '--publish', 'never'])
+run('node', ['scripts/build-mac-signed.mjs'])
 
 assertFile(app)
 assertFile(dmg)
 assertFile(zip)
 assertFile(latest)
-
-run('codesign', ['--sign', identity, '--timestamp', '--force', dmg])
-run('xcrun', ['notarytool', 'submit', dmg, '--keychain-profile', profile, '--wait'])
-run('xcrun', ['stapler', 'staple', dmg])
-
-refreshLatestMetadata()
-
-run('codesign', ['--verify', '--deep', '--strict', '--verbose=2', app])
-run('xcrun', ['stapler', 'validate', app])
-run('xcrun', ['stapler', 'validate', dmg])
-run('spctl', ['-a', '-vvv', '-t', 'install', dmg])
 
 ensureReleaseTag()
 uploadRelease()

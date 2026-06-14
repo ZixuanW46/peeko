@@ -1,7 +1,7 @@
 {
   "name": "peeko",
   "productName": "Peeko",
-  "version": "0.1.1",
+  "version": "0.1.0",
   "description": "Peeko is a quiet always-on-top mini browser for macOS video pages.",
   "main": "./out/main/index.js",
   "author": "Will",
@@ -17,10 +17,8 @@
     "test": "vitest run --passWithNoTests",
     "postinstall": "electron-builder install-app-deps",
     "build:unpack": "npm run build && electron-builder --dir",
-    "build:win": "npm run build && electron-builder --win",
     "build:mac": "npm run build && electron-builder --mac",
-    "build:linux": "npm run build && electron-builder --linux",
-    "public:snapshot": "node scripts/public-snapshot.mjs",
+    "build:mac:signed": "node scripts/build-mac-signed.mjs",
     "release:mac": "node scripts/release-mac-github.mjs"
   },
   "dependencies": {

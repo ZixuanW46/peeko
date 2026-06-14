@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 依赖 shared/updater 的纯状态机与双语文案函数
- * [OUTPUT]: 验证检查、可更新、下载、完成、失败与按钮/托盘文本
+ * [OUTPUT]: 验证检查、可更新、下载、完成、失败、单主动作与托盘文本
  * [POS]: tests 的更新系统守卫，防止自动更新状态散落在 renderer 分支里
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -9,6 +9,8 @@ import {
   createInitialUpdateState,
   reduceUpdateState,
   updateActionState,
+  updateErrorText,
+  updatePrimaryAction,
   updateStatusText,
   updateTrayCommand,
   updateTrayLabel
@@ -29,10 +31,15 @@ describe('update state machine', () => {
     expect(available.phase).toBe('available')
     expect(available.latestVersion).toBe('0.1.2')
     expect(updateActionState(available)).toEqual({
-      canCheck: true,
+      canCheck: false,
       canDownload: true,
       canInstall: false,
       busy: false
+    })
+    expect(updatePrimaryAction(available, 'zh')).toEqual({
+      command: 'update-download',
+      enabled: true,
+      label: '下载更新'
     })
     expect(updateTrayCommand(available)).toBe('update-download')
     expect(updateTrayLabel(available, 'en')).toBe('Update to 0.1.2...')
@@ -62,10 +69,15 @@ describe('update state machine', () => {
     expect(updateStatusText(downloading, 'en')).toBe('Downloading update 100%')
     expect(downloaded.phase).toBe('downloaded')
     expect(updateActionState(downloaded)).toEqual({
-      canCheck: true,
+      canCheck: false,
       canDownload: false,
       canInstall: true,
       busy: false
+    })
+    expect(updatePrimaryAction(downloaded, 'en')).toEqual({
+      command: 'update-install',
+      enabled: true,
+      label: 'Restart & Install'
     })
     expect(updateTrayCommand(downloaded)).toBe('update-install')
     expect(updateTrayLabel(downloaded, 'zh')).toBe('重启以更新')
@@ -81,5 +93,21 @@ describe('update state machine', () => {
     expect(state.currentVersion).toBe('0.1.1')
     expect(updateStatusText(state, 'en')).toBe('GitHub Release is unavailable')
     expect(updateActionState(state).canCheck).toBe(true)
+  })
+
+  it('GitHub 404 不把机器错误暴露给设置页', () => {
+    const raw = '404 {"method":"GET","url":"https://github.com/ZixuanW46/peeko"}'
+    const state = reduceUpdateState(createInitialUpdateState('0.1.1'), {
+      type: 'ERROR',
+      error: raw
+    })
+
+    expect(updateErrorText(raw, 'zh')).toBe('更新源尚未发布')
+    expect(updateStatusText(state, 'en')).toBe('Update feed is not published yet')
+    expect(updatePrimaryAction(state, 'en')).toEqual({
+      command: 'update-check',
+      enabled: true,
+      label: 'Check Again'
+    })
   })
 })

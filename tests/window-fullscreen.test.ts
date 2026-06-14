@@ -132,4 +132,33 @@ describe('window fullscreen visibility', () => {
     expect(win.hide).not.toHaveBeenCalled()
     expect(win.showInactive).toHaveBeenCalledTimes(2)
   })
+
+  it('输入编辑期间临时降到 floating 层，结束后恢复 screen-saver', async () => {
+    const { createFloatWindow, setEditingLevel } = await import('../src/main/window')
+
+    createFloatWindow('https://example.com/search')
+    const win = electron.MockBaseWindow.last!
+    win.setAlwaysOnTop.mockClear()
+
+    setEditingLevel(true)
+    expect(win.setAlwaysOnTop).toHaveBeenLastCalledWith(true, 'floating')
+
+    setEditingLevel(false)
+    expect(win.setAlwaysOnTop).toHaveBeenLastCalledWith(true, 'screen-saver')
+  })
+
+  it('原生全屏时输入编辑不抢回置顶层级', async () => {
+    const { createFloatWindow, toggleWindowFullscreen, setEditingLevel } =
+      await import('../src/main/window')
+
+    createFloatWindow('https://example.com/editor')
+    const win = electron.MockBaseWindow.last!
+
+    toggleWindowFullscreen()
+    win.setAlwaysOnTop.mockClear()
+
+    setEditingLevel(true)
+
+    expect(win.setAlwaysOnTop).not.toHaveBeenCalled()
+  })
 })

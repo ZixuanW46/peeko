@@ -73,16 +73,19 @@ const EVENT_ACTION: Record<string, string> = {
 }
 
 // ============================================================
-// 注入页面的 video 控制片段：永远操作"面积最大的就绪视频"
+// 注入页面的 video 控制片段：操作"面积最大的就绪视频"，无就绪视频时回退到最大视频
+// （首启未缓冲 readyState 0 也选得中；能否真的起播取决于 runJs 的 userGesture）
 // ============================================================
 const JS_PAUSE_ALL = `document.querySelectorAll('video').forEach(v => v.pause())`
 
-const mainVideo = `[...document.querySelectorAll('video')]
-  .filter(v => v.readyState > 0)
-  .sort((a, b) => {
+const mainVideo = `(() => {
+  const vids = [...document.querySelectorAll('video')].sort((a, b) => {
     const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect()
     return rb.width * rb.height - ra.width * ra.height
-  })[0]`
+  })
+  // 优先就绪视频；首启暂停且未缓冲(readyState 0)时回退到最大视频——play() 会自行触发加载
+  return vids.find(v => v.readyState > 0) ?? vids[0] ?? null
+})()`
 
 const JS_PLAY_MAIN = `(() => { const v = ${mainVideo}; if (v) v.play() })()`
 const JS_TOGGLE_MAIN = `(() => { const v = ${mainVideo}; if (v) v.paused ? v.play() : v.pause() })()`
@@ -90,8 +93,10 @@ const JS_PAGE_MUTED = `(() => { const v = ${mainVideo}; return v ? (v.muted || v
 const JS_UNMUTE_PAGE = `(() => { const v = ${mainVideo}; if (!v) return; v.muted = false; if (v.volume === 0) v.volume = 1 })()`
 
 function runJs(code: string): void {
+  // 第二参 userGesture=true：模拟用户手势，绕过浏览器自动播放策略——
+  // 否则首启暂停且从未被真实点击过的视频，脚本 v.play() 会被拦截、静默 reject。
   getFloat()
-    ?.pageView.webContents.executeJavaScript(code)
+    ?.pageView.webContents.executeJavaScript(code, true)
     .catch(() => {})
 }
 
