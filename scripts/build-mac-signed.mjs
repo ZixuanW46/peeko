@@ -272,7 +272,7 @@ function verifyApp(appPath) {
 function verifyDmg() {
   run('codesign', ['--verify', '--verbose=2', dmg])
   run('xcrun', ['stapler', 'validate', dmg])
-  run('spctl', ['-a', '-vvv', '-t', 'install', dmg])
+  run('spctl', ['-a', '-vvv', '-t', 'open', '--context', 'context:primary-signature', dmg])
 }
 
 function verifyMountedDmg() {
