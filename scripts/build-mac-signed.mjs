@@ -51,7 +51,7 @@ function childEnv(opts = {}) {
 
 function run(cmd, args, opts = {}) {
   const res = spawnSync(cmd, args, {
-    cwd: root,
+    cwd: opts.cwd ?? root,
     env: childEnv(opts),
     stdio: opts.quiet ? 'pipe' : 'inherit',
     text: true
