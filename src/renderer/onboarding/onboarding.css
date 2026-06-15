@@ -753,6 +753,8 @@ body[data-permission='restart'] #permission-icon {
 /* ---------- 快捷键总览（Act I.5）---------- */
 #cheat-card {
   width: min(680px, 66vw);
+  box-sizing: border-box;
+  max-height: calc(100vh - 48px);
   padding: 40px 48px;
   border-radius: 28px;
   background: var(--glass);
@@ -764,6 +766,7 @@ body[data-permission='restart'] #permission-icon {
   display: flex;
   flex-direction: column;
   gap: 14px;
+  overflow: hidden;
   opacity: 0;
   transform: translateY(12px);
   transition:
@@ -794,7 +797,9 @@ body[data-permission='restart'] #permission-icon {
   display: flex;
   flex-direction: column;
   gap: 11px;
+  min-height: 0;
   margin: 10px 0 2px;
+  overflow-y: auto;
 }
 
 .cheat-row {

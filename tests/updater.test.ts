@@ -10,6 +10,7 @@ import {
   reduceUpdateState,
   updateActionState,
   updateErrorText,
+  updateManualCheckResult,
   updatePrimaryAction,
   updateStatusText,
   updateTrayCommand,
@@ -43,6 +44,11 @@ describe('update state machine', () => {
     })
     expect(updateTrayCommand(available)).toBe('update-download')
     expect(updateTrayLabel(available, 'en')).toBe('Update to 0.1.2...')
+    expect(updateManualCheckResult(available, 'zh')).toEqual({
+      kind: 'info',
+      message: 'Peeko 0.1.2 可更新',
+      detail: '可以从菜单栏继续下载更新。'
+    })
   })
 
   it('无新版时给手动检查显示最新状态', () => {
@@ -54,6 +60,11 @@ describe('update state machine', () => {
     expect(state.phase).toBe('not-available')
     expect(updateStatusText(state, 'zh')).toBe('Peeko 已是最新版本')
     expect(updateActionState(state).canCheck).toBe(true)
+    expect(updateManualCheckResult(state, 'en')).toEqual({
+      kind: 'info',
+      message: 'Peeko is up to date',
+      detail: 'Current version 0.1.1.'
+    })
   })
 
   it('下载进度被收敛为 0-100，完成后只允许安装', () => {
@@ -108,6 +119,11 @@ describe('update state machine', () => {
       command: 'update-check',
       enabled: true,
       label: 'Check Again'
+    })
+    expect(updateManualCheckResult(state, 'zh')).toEqual({
+      kind: 'error',
+      message: '更新检查失败',
+      detail: '更新源尚未发布'
     })
   })
 })

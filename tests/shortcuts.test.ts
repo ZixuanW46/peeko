@@ -6,21 +6,31 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const electron = vi.hoisted(() => ({
-  appOn: vi.fn(),
-  register: vi.fn(() => true),
-  unregisterAll: vi.fn(),
-  isTrustedAccessibilityClient: vi.fn(() => true),
-  uioOn: vi.fn(),
-  uioStart: vi.fn()
-}))
+const electron = vi.hoisted(() => {
+  const uioHandlers = {} as Record<string, Array<(e: unknown) => void>>
+  return {
+    appOn: vi.fn(),
+    register: vi.fn(() => true),
+    unregisterAll: vi.fn(),
+    isTrustedAccessibilityClient: vi.fn(() => true),
+    uioHandlers,
+    uioOn: vi.fn((event: string, cb: (e: unknown) => void) => {
+      uioHandlers[event] ??= []
+      uioHandlers[event].push(cb)
+    }),
+    uioStart: vi.fn()
+  }
+})
 
 const win = vi.hoisted(() => ({
   rawHide: vi.fn(),
   rawShow: vi.fn(),
   hideFloatWindow: vi.fn(),
   showFloatWindow: vi.fn(),
-  toggleCinema: vi.fn()
+  toggleCinema: vi.fn(),
+  togglePlaybackFullscreen: vi.fn(),
+  adjustPassthroughOpacity: vi.fn(),
+  passthrough: true
 }))
 
 const media = vi.hoisted(() => ({
@@ -46,7 +56,7 @@ vi.mock('electron', () => ({
 
 vi.mock('uiohook-napi', () => ({
   uIOhook: { on: electron.uioOn, start: electron.uioStart, stop: vi.fn() },
-  UiohookKey: { X: 7 }
+  UiohookKey: { X: 7, ArrowUp: 57416, ArrowDown: 57424, ArrowLeft: 57419, ArrowRight: 57421 }
 }))
 
 vi.mock('../src/main/store', () => ({
@@ -58,9 +68,15 @@ vi.mock('../src/main/store', () => ({
         boss: 'Control+C',
         playpause: 'Control+P',
         mute: 'Control+M',
+        volumeUp: 'Control+Up',
+        volumeDown: 'Control+Down',
         mode: 'Control+B',
         passthrough: 'Control+T',
-        fullscreen: 'Control+Enter'
+        fullscreen: 'Control+Enter',
+        opacityUp: 'Control+Shift+Up',
+        opacityDown: 'Control+Shift+Down',
+        seekBack: 'Control+Left',
+        seekForward: 'Control+Right'
       }
     },
     patch: vi.fn()
@@ -84,22 +100,26 @@ vi.mock('../src/main/window', () => ({
   getOnboarding: () => null,
   isOnboarding: () => false,
   raiseOnboarding: vi.fn(),
+  adjustPassthroughOpacity: win.adjustPassthroughOpacity,
+  isPassthrough: () => win.passthrough,
   togglePassthrough: vi.fn(),
-  toggleWindowFullscreen: vi.fn(),
   hideFloatWindow: win.hideFloatWindow,
   showFloatWindow: win.showFloatWindow
 }))
 
 vi.mock('../src/main/modes', () => ({
-  toggleCinema: win.toggleCinema
+  toggleCinema: win.toggleCinema,
+  togglePlaybackFullscreen: win.togglePlaybackFullscreen
 }))
 
 describe('shortcuts effects', () => {
   beforeEach(() => {
     vi.resetModules()
     vi.clearAllMocks()
+    for (const key of Object.keys(electron.uioHandlers)) delete electron.uioHandlers[key]
     media.pageMuted = false
     media.audioMuted = false
+    win.passthrough = true
     media.executeJavaScript.mockImplementation(() => Promise.resolve(media.pageMuted))
   })
 
@@ -140,5 +160,67 @@ describe('shortcuts effects', () => {
     registerShortcuts()
 
     expect(electron.register).toHaveBeenCalledWith('Control+B', expect.any(Function))
+  })
+
+  it('方向键动作走 uiohook：音量 5% 步进，透明度用 Ctrl+Shift，快进快退不变', async () => {
+    const { registerShortcuts } = await import('../src/main/shortcuts')
+
+    registerShortcuts()
+    const keydown = electron.uioHandlers.keydown[0] as (e: {
+      keycode: number
+      altKey: boolean
+      shiftKey: boolean
+      ctrlKey: boolean
+      metaKey: boolean
+    }) => void
+
+    media.audioMuted = true
+    media.executeJavaScript.mockResolvedValue(true)
+    keydown({ keycode: 57416, altKey: false, shiftKey: false, ctrlKey: true, metaKey: false })
+    keydown({ keycode: 57424, altKey: false, shiftKey: false, ctrlKey: true, metaKey: false })
+    await Promise.resolve()
+    keydown({ keycode: 57416, altKey: false, shiftKey: true, ctrlKey: true, metaKey: false })
+    keydown({ keycode: 57424, altKey: false, shiftKey: true, ctrlKey: true, metaKey: false })
+    keydown({ keycode: 57419, altKey: false, shiftKey: false, ctrlKey: true, metaKey: false })
+    keydown({ keycode: 57421, altKey: false, shiftKey: false, ctrlKey: true, metaKey: false })
+
+    expect(electron.register).not.toHaveBeenCalledWith('Control+Up', expect.any(Function))
+    expect(electron.register).not.toHaveBeenCalledWith('Control+Shift+Up', expect.any(Function))
+    expect(electron.register).not.toHaveBeenCalledWith('Control+Right', expect.any(Function))
+    expect(media.executeJavaScript).toHaveBeenCalledWith(
+      expect.stringContaining('v.volume + 0.05'),
+      true
+    )
+    expect(media.executeJavaScript).toHaveBeenCalledWith(
+      expect.stringContaining('v.volume + -0.05'),
+      true
+    )
+    expect(media.setAudioMuted).toHaveBeenCalledWith(false)
+    expect(media.send).toHaveBeenCalledWith('state:muted', false)
+    expect(win.adjustPassthroughOpacity).toHaveBeenNthCalledWith(1, 0.05)
+    expect(win.adjustPassthroughOpacity).toHaveBeenNthCalledWith(2, -0.05)
+    expect(media.executeJavaScript).toHaveBeenCalledWith(expect.stringContaining('+ -10'), true)
+    expect(media.executeJavaScript).toHaveBeenCalledWith(expect.stringContaining('+ 10'), true)
+  })
+
+  it('没有主视频时音量快捷键不解除 WebContents 静音', async () => {
+    const { registerShortcuts } = await import('../src/main/shortcuts')
+
+    registerShortcuts()
+    const keydown = electron.uioHandlers.keydown[0] as (e: {
+      keycode: number
+      altKey: boolean
+      shiftKey: boolean
+      ctrlKey: boolean
+      metaKey: boolean
+    }) => void
+
+    media.audioMuted = true
+    media.executeJavaScript.mockResolvedValue(false)
+    keydown({ keycode: 57416, altKey: false, shiftKey: false, ctrlKey: true, metaKey: false })
+    await Promise.resolve()
+
+    expect(media.setAudioMuted).not.toHaveBeenCalled()
+    expect(media.send).not.toHaveBeenCalledWith('state:muted', false)
   })
 })

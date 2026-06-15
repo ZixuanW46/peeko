@@ -1,8 +1,8 @@
 /**
  * [INPUT]: 依赖 electron 的 ipcRenderer（隔离世界，目标网页不可见）
  * [OUTPUT]: 注入目标网页：移窗（浏览⌥拖/观影裸拖/拖把手，拖后吞 click）、双击返回、
- *           ESC 锁、主视频探测器（主进程心跳驱动）、暂停徽章、观影提示、
- *           悬停控制条（Feather/Lucide 线条图标、动态换态、收藏面板、竖向音量滑条、⚽主页）
+ *           ESC 锁、主视频探测器（主进程心跳驱动）、播放徽章、观影提示、
+ *           悬停控制条（Feather/Lucide 线条图标、动态换态、resize 几何同步、收藏面板、竖向音量滑条、穿透透明度滑条、⚽主页）
  * [POS]: preload 的网页侧探针，与 main/ipc.ts 通道协议对偶。
  *        纪律：核心（拖动/探测/锁）在前，装饰（徽章/控制条）在后且 try/catch 隔离；
  *        全文件禁用 innerHTML——部分站点的 Trusted Types CSP 会让它当场抛异常；
@@ -11,8 +11,17 @@
  */
 import { ipcRenderer } from 'electron'
 import { tx, type LanguageSettings, type ResolvedLanguage } from '../shared/i18n'
-import { prettyShortcut, type Action, type ShortcutMap } from '../shared/shortcuts'
-import { effectiveVolumeFor, shouldForwardPageDoubleClick } from './ui-logic'
+import {
+  DEFAULT_SHORTCUTS,
+  prettyShortcut,
+  type Action,
+  type ShortcutMap
+} from '../shared/shortcuts'
+import {
+  effectiveVolumeFor,
+  shouldCapturePageShortcut,
+  shouldForwardPageDoubleClick
+} from './ui-logic'
 
 // 开机心跳：preload 是否在此页面存活的铁证
 ipcRenderer.send('debug:detector', { boot: true, href: location.href.slice(0, 80) })
@@ -166,13 +175,18 @@ ipcRenderer.on('mode:cinema', (_e, on: boolean) => {
 window.addEventListener(
   'keydown',
   (e) => {
+    if (document.fullscreenElement && e.key === 'Escape') return
+    if (trusted(e) && shouldCapturePageShortcut(e, shortcutCache)) {
+      e.preventDefault()
+      e.stopImmediatePropagation()
+      return
+    }
     if (floatFullscreen && e.key === 'Escape') {
       e.preventDefault()
       e.stopImmediatePropagation()
       ipcRenderer.send('ctrl:exit-fullscreen')
       return
     }
-    if (document.fullscreenElement && e.key === 'Escape') return
     if (cinema && e.key === 'Escape') {
       e.preventDefault()
       e.stopImmediatePropagation()
@@ -342,6 +356,7 @@ document.addEventListener(
       bar?.pill,
       bar?.favPanel,
       vol?.panel,
+      opacity?.panel,
       handle,
       fullscreenBtn,
       quitBtn
@@ -349,6 +364,7 @@ document.addEventListener(
       if (n?.isConnected) root.appendChild(n)
     }
     updateBar()
+    if (!document.fullscreenElement && floatFullscreen) ipcRenderer.send('ctrl:exit-fullscreen')
   },
   true
 )
@@ -364,6 +380,9 @@ const GLASS = `
 const SIDE_BUTTON_BG = 'rgba(28,28,32,.45)'
 const SIDE_BUTTON_HOVER_BG = 'rgba(255,255,255,.14)'
 const SIDE_BUTTON_PRESS_BG = 'rgba(255,255,255,.22)'
+const SIDE_BUTTON_SIZE = 34
+const SIDE_BUTTON_GAP = 12
+const HANDLE_OFFSET = SIDE_BUTTON_SIZE + SIDE_BUTTON_GAP
 
 function setSideButtonState(node: HTMLElement, hover: boolean, pressed = false): void {
   node.dataset.hover = hover ? '1' : ''
@@ -394,19 +413,13 @@ const badge = ((): HTMLElement | null => {
        align-items: center; justify-content: center; ${GLASS}`
     )
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
-    svg.setAttribute('width', '22')
-    svg.setAttribute('height', '26')
-    svg.setAttribute('viewBox', '0 0 22 26')
-    for (const x of ['2', '14']) {
-      const bar = document.createElementNS('http://www.w3.org/2000/svg', 'rect')
-      bar.setAttribute('x', x)
-      bar.setAttribute('y', '2')
-      bar.setAttribute('width', '6')
-      bar.setAttribute('height', '22')
-      bar.setAttribute('rx', '2')
-      bar.setAttribute('fill', 'rgba(255,255,255,.92)')
-      svg.appendChild(bar)
-    }
+    svg.setAttribute('width', '28')
+    svg.setAttribute('height', '28')
+    svg.setAttribute('viewBox', '0 0 24 24')
+    const play = document.createElementNS('http://www.w3.org/2000/svg', 'polygon')
+    play.setAttribute('points', '8 5 19 12 8 19 8 5')
+    play.setAttribute('fill', 'rgba(255,255,255,.92)')
+    svg.appendChild(play)
     disc.appendChild(svg)
     wrap.appendChild(disc)
     return wrap
@@ -632,18 +645,23 @@ function setTip(target: HTMLElement, text: string, action?: Action): void {
 // 主进程推送的窗口级状态（页面事件感知不到的部分）
 let wcMuted = false
 let passthroughOn = false
+let passOpacity = 0.55
 
-let shortcutCache: Partial<ShortcutMap> = {}
+let shortcutCache: ShortcutMap = { ...DEFAULT_SHORTCUTS }
 
 async function refreshShortcuts(): Promise<void> {
   try {
     shortcutCache = (await ipcRenderer.invoke('settings:get-shortcuts')) as ShortcutMap
   } catch {
-    shortcutCache = {}
+    shortcutCache = { ...DEFAULT_SHORTCUTS }
   }
 }
 
 void refreshShortcuts()
+ipcRenderer.on('shortcuts:changed', (_e, next: ShortcutMap) => {
+  shortcutCache = next
+  updateLocalizedChrome()
+})
 
 ipcRenderer.on('state:muted', (_e, on: boolean) => {
   wcMuted = on
@@ -653,9 +671,16 @@ ipcRenderer.on('state:passthrough', (_e, on: boolean) => {
   passthroughOn = on
   updateBar()
 })
+ipcRenderer.on('state:passthrough-opacity', (_e, value: number) => {
+  passOpacity = Math.min(0.9, Math.max(0.1, value))
+  renderOpacity(passOpacity)
+})
 ipcRenderer.on('state:fullscreen', (_e, on: boolean) => {
   floatFullscreen = on
   updateBar()
+})
+ipcRenderer.on('page:exit-video-fullscreen', () => {
+  if (document.fullscreenElement) void document.exitFullscreen().catch(() => {})
 })
 
 interface Bar {
@@ -1015,6 +1040,133 @@ function hideVolPanel(): void {
   }, 250)
 }
 
+// ============================================================
+// 穿透透明度滑条：只在 click-through 现场出现，右侧竖向控制。
+// 与设置窗同一份 store 值，拖动时按 5% 网格吸附，避免细碎状态。
+// ============================================================
+interface OpacitySlider {
+  panel: HTMLElement
+  fill: HTMLElement
+  thumb: HTMLElement
+  track: HTMLElement
+  label: HTMLElement
+}
+
+const opacity = ((): OpacitySlider | null => {
+  try {
+    const panel = el(
+      'div',
+      `position: fixed; right: 14px; top: 50%; transform: translateY(-50%);
+       display: none; padding: 11px 10px 9px; border-radius: 12px;
+       ${GLASS} z-index: 2147483647; cursor: pointer;`
+    )
+    panel.setAttribute('data-peeko-badge', '')
+    panel.addEventListener('dblclick', (e) => e.stopPropagation())
+
+    const track = el(
+      'div',
+      `position: relative; width: 4px; height: 128px; margin: 0 auto;
+       background: rgba(255,255,255,.28); border-radius: 2px;`
+    )
+    const fill = el(
+      'div',
+      `position: absolute; bottom: 0; left: 0; width: 100%; height: 55%;
+       background: rgba(255,255,255,.92); border-radius: 2px;`
+    )
+    const thumb = el(
+      'div',
+      `position: absolute; left: 50%; bottom: 55%;
+       transform: translate(-50%, 50%); width: 13px; height: 13px;
+       border-radius: 50%; background: #fff;
+       box-shadow: 0 1px 3px rgba(0,0,0,.35); pointer-events: none;`
+    )
+    const label = el(
+      'div',
+      `margin-top: 7px; min-width: 28px; text-align: center;
+       font: 10px 'SF Mono', ui-monospace, monospace; color: rgba(255,255,255,.78);
+       pointer-events: none;`
+    )
+    track.appendChild(fill)
+    track.appendChild(thumb)
+    panel.append(track, label)
+
+    panel.addEventListener('mouseenter', (e) => {
+      if (!trusted(e)) return
+      opacityHover = true
+      ipcRenderer.send('bar:hover', true)
+      setOpacityShown(true)
+    })
+    panel.addEventListener('mouseleave', (e) => {
+      if (!trusted(e)) return
+      opacityHover = false
+      ipcRenderer.send('bar:hover', false)
+      if (!opacityDragging) setOpacityShown(barVisible && passthroughOn)
+    })
+    return { panel, fill, thumb, track, label }
+  } catch {
+    return null
+  }
+})()
+
+let opacityHover = false
+let opacityDragging = false
+
+function opacityStep(value: number): number {
+  return Math.min(0.9, Math.max(0.1, Math.round(value * 20) / 20))
+}
+
+function renderOpacity(ratio: number): void {
+  if (!opacity) return
+  const pct = Math.round(ratio * 100)
+  opacity.fill.style.height = `${pct}%`
+  opacity.thumb.style.bottom = `${pct}%`
+  opacity.label.textContent = `${pct}%`
+}
+
+function setOpacityShown(shown: boolean): void {
+  if (!opacity) return
+  if (shown && opacity.panel.parentElement !== uiRoot()) uiRoot().appendChild(opacity.panel)
+  renderOpacity(passOpacity)
+  opacity.panel.style.display = shown ? 'block' : 'none'
+}
+
+function applyOpacityFromY(clientY: number): void {
+  if (!opacity) return
+  const r = opacity.track.getBoundingClientRect()
+  const ratio = opacityStep((r.bottom - clientY) / r.height)
+  passOpacity = ratio
+  renderOpacity(ratio)
+  void ipcRenderer.invoke('settings:set-passthrough-opacity', ratio)
+}
+
+if (opacity) {
+  opacity.panel.addEventListener('mousedown', (e) => {
+    if (!trusted(e)) return
+    e.stopPropagation()
+    opacityDragging = true
+    ipcRenderer.send('bar:hover', true)
+    applyOpacityFromY(e.clientY)
+  })
+  window.addEventListener(
+    'mousemove',
+    (e) => {
+      if (!trusted(e)) return
+      if (opacityDragging) applyOpacityFromY(e.clientY)
+    },
+    true
+  )
+  window.addEventListener(
+    'mouseup',
+    () => {
+      if (!opacityDragging) return
+      opacityDragging = false
+      ipcRenderer.send('bar:hover', opacityHover)
+      setOpacityShown((barVisible || opacityHover) && passthroughOn)
+    },
+    true
+  )
+}
+
 function openUrlInput(): void {
   if (!bar) return
   bar.iconRow.style.display = 'none'
@@ -1022,6 +1174,7 @@ function openUrlInput(): void {
   bar.urlInput.value = location.href
   bar.urlInput.focus()
   bar.urlInput.select()
+  scheduleSideChromeLayout()
   ipcRenderer.send('bar:editing', true) // 降层让位输入法候选窗
 }
 
@@ -1029,6 +1182,7 @@ function closeUrlInput(): void {
   if (!bar) return
   bar.urlInput.style.display = 'none'
   bar.iconRow.style.display = 'flex'
+  scheduleSideChromeLayout()
   ipcRenderer.send('bar:editing', false)
 }
 
@@ -1114,6 +1268,46 @@ function wireCap(target: HTMLElement): void {
   })
 }
 
+let chromeLayoutFrame: number | null = null
+
+function scheduleSideChromeLayout(): void {
+  if (chromeLayoutFrame !== null) return
+  chromeLayoutFrame = requestAnimationFrame(() => {
+    chromeLayoutFrame = null
+    syncSideChromeLayout()
+  })
+}
+
+function syncSideChromeLayout(): void {
+  if (!bar) return
+  const shown = barVisible
+  const r = bar.pill.getBoundingClientRect()
+
+  if (handle) {
+    const visible = shown && !cinema
+    if (visible) handle.style.left = `${Math.round(r.left - HANDLE_OFFSET)}px`
+    handle.style.opacity = visible ? '1' : '0'
+    handle.style.pointerEvents = visible ? 'auto' : 'none'
+  }
+
+  if (fullscreenBtn) {
+    if (shown) {
+      fullscreenBtn.style.left = `${Math.round(r.right + SIDE_BUTTON_GAP)}px`
+      updateFullscreenButton()
+    }
+    fullscreenBtn.style.opacity = shown ? '1' : '0'
+    fullscreenBtn.style.pointerEvents = shown ? 'auto' : 'none'
+  }
+
+  if (quitBtn) {
+    quitBtn.style.opacity = shown ? '1' : '0'
+    quitBtn.style.pointerEvents = shown ? 'auto' : 'none'
+  }
+
+  if (capHoverTarget && cap.style.opacity !== '0') placeCap(capHoverTarget)
+  if (vol && vol.panel.style.display === 'block') showVolPanel()
+}
+
 // 状态 → 图标：按钮显示的是"按下后会发生什么"
 function updateBar(): void {
   if (!bar) return
@@ -1166,6 +1360,7 @@ function updateBar(): void {
   )
   setIcon(bar.pass, 'pointer')
   updateFullscreenButton()
+  scheduleSideChromeLayout()
   // 只在状态翻转时碰背景——否则每次 mousemove 都会抹掉 hover 高亮
   const wasActive = bar.pass.dataset.active === '1'
   if (passthroughOn !== wasActive) {
@@ -1177,6 +1372,7 @@ function updateBar(): void {
       bar.pass.style.background = 'transparent'
     }
   }
+  setOpacityShown(passthroughOn && (barVisible || opacityHover || opacityDragging))
 }
 
 // 页面级状态变化实时反映到图标
@@ -1191,7 +1387,7 @@ const handle = ((): HTMLElement | null => {
   try {
     const h = el(
       'div',
-      `position: fixed; bottom: 14px; width: 34px; height: 34px;
+      `position: fixed; bottom: 14px; width: ${SIDE_BUTTON_SIZE}px; height: ${SIDE_BUTTON_SIZE}px;
        border-radius: 50%; display: flex; align-items: center; justify-content: center;
        color: rgba(255,255,255,.85); cursor: grab; ${GLASS}
        z-index: 2147483647; opacity: 0;
@@ -1235,7 +1431,7 @@ const handle = ((): HTMLElement | null => {
 })()
 
 // ============================================================
-// 退出叉：右上角悬停浮现的玻璃圆钮——退出不再只有菜单栏一条路
+// 老板键叉：右上角悬停浮现的玻璃圆钮——只潜伏，不真正退出
 // ============================================================
 const quitBtn = ((): HTMLElement | null => {
   try {
@@ -1250,7 +1446,7 @@ const quitBtn = ((): HTMLElement | null => {
     )
     q.setAttribute('data-peeko-badge', '')
     q.appendChild(icon('x'))
-    setTip(q, tr('Quit Peeko', '退出 Peeko'))
+    setTip(q, tr('Quick vanish', '一键隐去'))
     q.addEventListener('mouseenter', (e) => {
       if (!trusted(e)) return
       setSideButtonState(q, true, q.dataset.pressed === '1')
@@ -1268,7 +1464,7 @@ const quitBtn = ((): HTMLElement | null => {
     q.addEventListener('click', (e) => {
       if (!trusted(e)) return
       e.stopPropagation()
-      ipcRenderer.send('ctrl:quit')
+      ipcRenderer.send('ctrl:boss')
     })
     q.addEventListener('dblclick', (e) => e.stopPropagation())
     return q
@@ -1284,7 +1480,7 @@ const fullscreenBtn = ((): HTMLElement | null => {
   try {
     const b = el(
       'button',
-      `position: fixed; bottom: 14px; width: 34px; height: 34px; border: 0;
+      `position: fixed; bottom: 14px; width: ${SIDE_BUTTON_SIZE}px; height: ${SIDE_BUTTON_SIZE}px; border: 0;
        border-radius: 50%; display: flex; align-items: center; justify-content: center;
        color: rgba(255,255,255,.85); cursor: pointer; ${GLASS}
        z-index: 2147483647; opacity: 0;
@@ -1324,8 +1520,8 @@ function updateFullscreenButton(): void {
   setTip(
     fullscreenBtn,
     floatFullscreen
-      ? tr('Exit Peeko window fullscreen (Esc)', '退出 Peeko 窗口全屏（Esc）')
-      : tr('Peeko window fullscreen', 'Peeko 窗口全屏'),
+      ? tr('Exit video fullscreen (Esc)', '退出视频全屏（Esc）')
+      : tr('Video fullscreen', '视频全屏'),
     'fullscreen'
   )
 }
@@ -1344,7 +1540,7 @@ function updateLocalizedChrome(): void {
     if (bar.favPanel.style.display === 'flex') void renderFavPanel()
   }
   if (handle) setTip(handle, tr('Hold and drag window', '按住拖动窗口'))
-  if (quitBtn) setTip(quitBtn, tr('Quit Peeko', '退出 Peeko'))
+  if (quitBtn) setTip(quitBtn, tr('Quick vanish', '一键隐去'))
   updateBar()
 }
 
@@ -1358,28 +1554,14 @@ function setBarShown(shown: boolean): void {
   barVisible = shown
   bar.pill.style.opacity = shown ? '1' : '0'
   bar.pill.style.pointerEvents = shown ? 'auto' : 'none'
-  if (handle) {
-    const visible = shown && !cinema
-    if (visible) {
-      const r = bar.pill.getBoundingClientRect()
-      handle.style.left = `${r.left - 46}px`
-    }
-    handle.style.opacity = visible ? '1' : '0'
-    handle.style.pointerEvents = visible ? 'auto' : 'none'
-  }
-  if (fullscreenBtn) {
-    if (shown) {
-      const r = bar.pill.getBoundingClientRect()
-      fullscreenBtn.style.left = `${r.right + 12}px`
-      updateFullscreenButton()
-    }
-    fullscreenBtn.style.opacity = shown ? '1' : '0'
-    fullscreenBtn.style.pointerEvents = shown ? 'auto' : 'none'
-  }
-  if (quitBtn) {
-    quitBtn.style.opacity = shown ? '1' : '0'
-    quitBtn.style.pointerEvents = shown ? 'auto' : 'none'
-  }
+  syncSideChromeLayout()
+  setOpacityShown(passthroughOn && (shown || opacityHover || opacityDragging))
+}
+
+let pillResizeObserver: ResizeObserver | null = null
+if (bar && typeof ResizeObserver !== 'undefined') {
+  pillResizeObserver = new ResizeObserver(() => scheduleSideChromeLayout())
+  pillResizeObserver.observe(bar.pill)
 }
 
 window.addEventListener(
@@ -1400,9 +1582,12 @@ window.addEventListener(
       if (bar.urlInput.style.display === 'block') return // 输入网址中不隐没
       if (bar.favPanel.style.display === 'flex') return // 收藏面板打开时不隐没
       if (vol && vol.panel.style.display === 'block') return // 调音量中不隐没
+      if (opacityHover || opacityDragging) return // 调透明度中不隐没
       setBarShown(false)
       ipcRenderer.send('bar:hover', false) // 隐没即解除穿透豁免，防状态卡死
     }, 2000)
   },
   true
 )
+
+window.addEventListener('resize', () => scheduleSideChromeLayout(), true)

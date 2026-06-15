@@ -34,7 +34,9 @@ const LEGACY_DEFAULT_SHORTCUTS: Partial<ShortcutMap> = {
   playpause: 'Alt+Shift+P',
   mute: 'Alt+Shift+M',
   passthrough: 'Alt+Shift+T',
-  fullscreen: 'Alt+Shift+Enter'
+  fullscreen: 'Alt+Shift+Enter',
+  opacityUp: 'Control+Up',
+  opacityDown: 'Control+Down'
 }
 const LEGACY_FULLSCREEN_DEFAULT = 'Control+Shift+Enter'
 
@@ -58,7 +60,7 @@ const DEFAULTS: StoreData = {
   cinemaBounds: null,
   favorites: [],
   shortcuts: DEFAULT_SHORTCUTS,
-  autoCinema: true,
+  autoCinema: false,
   passthroughOpacity: 0.55,
   onboarded: false,
   showInDock: false,

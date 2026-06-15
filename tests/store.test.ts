@@ -44,6 +44,7 @@ describe('store 文件命名', () => {
     const { store, STORE_FILE, DEFAULT_SHORTCUTS } = await loadStore()
 
     expect(store.data.shortcuts).toEqual(DEFAULT_SHORTCUTS)
+    expect(store.data.autoCinema).toBe(false)
 
     store.patch({ onboarded: true })
     vi.advanceTimersByTime(500)
@@ -94,6 +95,19 @@ describe('store 文件命名', () => {
     const { store } = await loadStore()
 
     expect(store.data.shortcuts.fullscreen).toBe('Control+Enter')
+  })
+
+  it('旧透明度方向键默认迁移到 Control+Shift，给音量让出 Control+上下', async () => {
+    writeFileSync(
+      join(electron.userData, 'peeko-store.json'),
+      JSON.stringify({ shortcuts: { opacityUp: 'Control+Up', opacityDown: 'Control+Down' } })
+    )
+    const { store } = await loadStore()
+
+    expect(store.data.shortcuts.volumeUp).toBe('Control+Up')
+    expect(store.data.shortcuts.volumeDown).toBe('Control+Down')
+    expect(store.data.shortcuts.opacityUp).toBe('Control+Shift+Up')
+    expect(store.data.shortcuts.opacityDown).toBe('Control+Shift+Down')
   })
 
   it('用户自定义快捷键不被默认迁移覆盖', async () => {

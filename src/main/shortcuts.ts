@@ -1,23 +1,24 @@
 /**
  * [INPUT]: 依赖 electron 的 globalShortcut/systemPreferences/app，uiohook-napi 的全局键钩，
  *          ./state-machine 的 createMachine，./window 的浮窗单例与穿透开关，./store 的快捷键映射
- * [OUTPUT]: 对外提供 registerShortcuts()、rebindShortcuts()、togglePlayPause/toggleMute
+ * [OUTPUT]: 对外提供 registerShortcuts()、rebindShortcuts()、togglePlayPause/toggleMute/adjustMainVolume/seekMain 与老板键派发
  * [POS]: main 的输入层，状态机唯一的事件来源；长按 peek 的 uiohook 权限降级在此
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
 import { app, globalShortcut, systemPreferences } from 'electron'
 import { uIOhook, UiohookKey } from 'uiohook-napi'
 import { createMachine, type Effect, type Machine } from './state-machine'
-import { toggleCinema } from './modes'
+import { toggleCinema, togglePlaybackFullscreen } from './modes'
 import {
+  adjustPassthroughOpacity,
   getFloat,
   getOnboarding,
   isOnboarding,
+  isPassthrough,
   raiseOnboarding,
   hideFloatWindow,
   showFloatWindow,
-  togglePassthrough,
-  toggleWindowFullscreen
+  togglePassthrough
 } from './window'
 import { store, type Action, type ShortcutMap } from './store'
 import { t } from './i18n'
@@ -38,9 +39,13 @@ export interface ShortcutHealth {
 
 let shortcutFailures: ShortcutFailure[] = []
 let recordingShortcuts = false
-let peekHookInstalled = false
-let peekHookStarted = false
-let peekHookError = ''
+let keyboardHookInstalled = false
+let keyboardHookStarted = false
+let keyboardHookError = ''
+
+const SEEK_STEP_SECONDS = 10
+const OPACITY_STEP = 0.05
+const VOLUME_STEP = 0.05
 
 const ACTIONS: Action[] = [
   'hide',
@@ -48,11 +53,26 @@ const ACTIONS: Action[] = [
   'boss',
   'playpause',
   'mute',
+  'volumeUp',
+  'volumeDown',
   'mode',
   'passthrough',
-  'fullscreen'
+  'fullscreen',
+  'opacityUp',
+  'opacityDown',
+  'seekBack',
+  'seekForward'
 ]
 const CRITICAL_ACTIONS = new Set<Action>(['hide', 'peek', 'boss'])
+const HOOK_ACTIONS = new Set<Action>([
+  'peek',
+  'volumeUp',
+  'volumeDown',
+  'opacityUp',
+  'opacityDown',
+  'seekBack',
+  'seekForward'
+])
 
 export const getShortcutFailures = (): ShortcutFailure[] => [...shortcutFailures]
 export const isRecordingShortcuts = (): boolean => recordingShortcuts
@@ -91,6 +111,19 @@ const JS_PLAY_MAIN = `(() => { const v = ${mainVideo}; if (v) v.play() })()`
 const JS_TOGGLE_MAIN = `(() => { const v = ${mainVideo}; if (v) v.paused ? v.play() : v.pause() })()`
 const JS_PAGE_MUTED = `(() => { const v = ${mainVideo}; return v ? (v.muted || v.volume === 0) : null })()`
 const JS_UNMUTE_PAGE = `(() => { const v = ${mainVideo}; if (!v) return; v.muted = false; if (v.volume === 0) v.volume = 1 })()`
+const JS_ADJUST_MAIN_VOLUME = (delta: number): string => `(() => {
+  const v = ${mainVideo}
+  if (!v) return false
+  v.volume = Math.max(0, Math.min(1, v.volume + ${delta}))
+  if (${delta} > 0) v.muted = false
+  return true
+})()`
+const JS_SEEK_MAIN = (delta: number): string => `(() => {
+  const v = ${mainVideo}
+  if (!v) return
+  const duration = Number.isFinite(v.duration) ? v.duration : Infinity
+  v.currentTime = Math.max(0, Math.min(duration, v.currentTime + ${delta}))
+})()`
 
 function runJs(code: string): void {
   // 第二参 userGesture=true：模拟用户手势，绕过浏览器自动播放策略——
@@ -102,8 +135,22 @@ function runJs(code: string): void {
 
 // 供控制条 IPC 复用——按钮永远只是快捷键的回显
 export const togglePlayPause = (): void => runJs(JS_TOGGLE_MAIN)
+export const seekMain = (deltaSeconds: number): void => runJs(JS_SEEK_MAIN(deltaSeconds))
+export function adjustMainVolume(delta: number): void {
+  const wc = getFloat()?.pageView.webContents
+  if (!wc) return
+  wc.executeJavaScript(JS_ADJUST_MAIN_VOLUME(delta), true)
+    .then((changed) => {
+      if (changed && delta > 0 && wc.isAudioMuted()) {
+        wc.setAudioMuted(false)
+        wc.send('state:muted', false)
+      }
+    })
+    .catch(() => {})
+}
 
 export const dispatchHideToggle = (): void => machine?.dispatch('HIDE_TOGGLE')
+export const dispatchBoss = (): void => machine?.dispatch('BOSS')
 
 // 闯关状态预置：每关开始前把真实窗口摆到该关需要的起点
 export const prepareDemo = (target: 'NORMAL' | 'HIDDEN'): void =>
@@ -164,7 +211,7 @@ let machine: Machine | null = null
 // 键位规格随每次按键从 store 现读——改键即时生效，无需重启钩子。
 // macOS 未授辅助功能权限时 uIOhook.start() 会崩溃——前置检查降级。
 // ============================================================
-interface PeekSpec {
+interface KeySpec {
   code: number
   alt: boolean
   shift: boolean
@@ -172,10 +219,20 @@ interface PeekSpec {
   meta: boolean
 }
 
-function peekSpecFrom(accelerator: string): PeekSpec | null {
+const UIHOOK_KEY_ALIASES: Record<string, string> = {
+  Up: 'ArrowUp',
+  Down: 'ArrowDown',
+  Left: 'ArrowLeft',
+  Right: 'ArrowRight',
+  Esc: 'Escape'
+}
+
+function keySpecFrom(accelerator: string): KeySpec | null {
   const parts = accelerator.split('+')
-  const key = parts[parts.length - 1].toUpperCase()
-  const code = (UiohookKey as Record<string, number>)[key]
+  const raw = parts[parts.length - 1]
+  const key = UIHOOK_KEY_ALIASES[raw] ?? raw
+  const keys = UiohookKey as Record<string, number>
+  const code = keys[key] ?? keys[key.toUpperCase()]
   if (!code) return null
   return {
     code,
@@ -186,63 +243,108 @@ function peekSpecFrom(accelerator: string): PeekSpec | null {
   }
 }
 
-function peekSpec(): PeekSpec | null {
-  return peekSpecFrom(store.data.shortcuts.peek)
+function keySpec(action: Action): KeySpec | null {
+  return keySpecFrom(store.data.shortcuts[action])
 }
 
-function setupPeekKey(): void {
+function matchesSpec(
+  e: { keycode: number; altKey: boolean; shiftKey: boolean; ctrlKey: boolean; metaKey: boolean },
+  s: KeySpec | null
+): boolean {
+  return Boolean(
+    s &&
+    e.keycode === s.code &&
+    e.altKey === s.alt &&
+    e.shiftKey === s.shift &&
+    e.ctrlKey === s.ctrl &&
+    e.metaKey === s.meta
+  )
+}
+
+function setupKeyboardHook(): void {
   // 权限自愈：未授权则轮询等待，用户在系统设置打开开关后立即激活，无需重启
   if (process.platform === 'darwin' && !systemPreferences.isTrustedAccessibilityClient(false)) {
-    console.warn('[shortcuts] 辅助功能未授权，长按显示待命轮询中')
+    console.warn('[shortcuts] 辅助功能未授权，全局键盘钩子待命轮询中')
     const poll = setInterval(() => {
       if (systemPreferences.isTrustedAccessibilityClient(false)) {
         clearInterval(poll)
-        startPeekHook()
+        startKeyboardHook()
       }
     }, 5000)
     app.on('will-quit', () => clearInterval(poll))
     return
   }
-  startPeekHook()
+  startKeyboardHook()
 }
 
-function startPeekHook(): void {
-  if (peekHookStarted) return
+function runHookAction(action: Action): void {
+  if (machine?.mode() === 'FEIGN') return
+  switch (action) {
+    case 'volumeUp':
+      adjustMainVolume(VOLUME_STEP)
+      break
+    case 'volumeDown':
+      adjustMainVolume(-VOLUME_STEP)
+      break
+    case 'opacityUp':
+      if (isPassthrough()) adjustPassthroughOpacity(OPACITY_STEP)
+      break
+    case 'opacityDown':
+      if (isPassthrough()) adjustPassthroughOpacity(-OPACITY_STEP)
+      break
+    case 'seekBack':
+      seekMain(-SEEK_STEP_SECONDS)
+      break
+    case 'seekForward':
+      seekMain(SEEK_STEP_SECONDS)
+      break
+  }
+}
+
+function startKeyboardHook(): void {
+  if (keyboardHookStarted) return
   let held = false
-  if (!peekHookInstalled) {
+  if (!keyboardHookInstalled) {
     uIOhook.on('keydown', (e) => {
       if (recordingShortcuts) return
-      const s = peekSpec()
-      if (!s || held) return
-      if (
-        e.keycode === s.code &&
-        e.altKey === s.alt &&
-        e.shiftKey === s.shift &&
-        e.ctrlKey === s.ctrl &&
-        e.metaKey === s.meta
-      ) {
+      const peek = keySpec('peek')
+      if (!held && matchesSpec(e, peek)) {
         held = true
         machine?.dispatch('PEEK_DOWN')
+        return
+      }
+      for (const action of [
+        'volumeUp',
+        'volumeDown',
+        'opacityUp',
+        'opacityDown',
+        'seekBack',
+        'seekForward'
+      ] as Action[]) {
+        if (matchesSpec(e, keySpec(action))) {
+          runHookAction(action)
+          return
+        }
       }
     })
     uIOhook.on('keyup', (e) => {
       if (recordingShortcuts) return
-      const s = peekSpec()
+      const s = keySpec('peek')
       if (held && s && e.keycode === s.code) {
         held = false
         machine?.dispatch('PEEK_UP')
       }
     })
-    peekHookInstalled = true
+    keyboardHookInstalled = true
     app.on('will-quit', () => uIOhook.stop())
   }
   try {
     uIOhook.start()
-    peekHookStarted = true
-    peekHookError = ''
+    keyboardHookStarted = true
+    keyboardHookError = ''
   } catch (err) {
-    peekHookStarted = false
-    peekHookError = err instanceof Error ? err.message : String(err)
+    keyboardHookStarted = false
+    keyboardHookError = err instanceof Error ? err.message : String(err)
   }
 }
 
@@ -277,7 +379,16 @@ function handlerFor(action: Action): () => void {
         echoToOnboarding('passthrough')
       }
     case 'fullscreen':
-      return notFeign(() => toggleWindowFullscreen())
+      return notFeign(() => {
+        void togglePlaybackFullscreen()
+      })
+    case 'volumeUp':
+    case 'volumeDown':
+    case 'opacityUp':
+    case 'opacityDown':
+    case 'seekBack':
+    case 'seekForward':
+      return () => {}
     case 'peek':
       return () => {}
   }
@@ -285,6 +396,7 @@ function handlerFor(action: Action): () => void {
 
 function bindAction(action: Action): void {
   shortcutFailures = shortcutFailures.filter((f) => f.action !== action)
+  if (HOOK_ACTIONS.has(action)) return
   const accelerator = store.data.shortcuts[action]
   if (!globalShortcut.register(accelerator, handlerFor(action))) {
     shortcutFailures.push({ action, accelerator })
@@ -333,6 +445,18 @@ export function probeShortcut(
         '该按键已被其他 Peeko 动作占用'
       )
     }
+
+  if (HOOK_ACTIONS.has(action)) {
+    return keySpecFrom(accelerator)
+      ? { ok: true }
+      : {
+          ok: false,
+          reason: t(
+            'This shortcut cannot be handled by the key listener',
+            '键盘监听暂不支持这个按键'
+          )
+        }
+  }
 
   const current = store.data.shortcuts[action]
   const wasCurrentRegistered = globalShortcut.isRegistered(current)
@@ -395,9 +519,9 @@ export function getShortcutHealth(): ShortcutHealth[] {
   if (
     process.platform === 'darwin' &&
     systemPreferences.isTrustedAccessibilityClient(false) &&
-    !peekHookStarted
+    !keyboardHookStarted
   ) {
-    startPeekHook()
+    startKeyboardHook()
   }
 
   const failures = new Map(shortcutFailures.map((f) => [f.action, f.accelerator]))
@@ -411,17 +535,20 @@ export function getShortcutHealth(): ShortcutHealth[] {
         t('Shortcut is already used by macOS or another app', '快捷键已被系统或其他软件占用')
       )
     }
-    if (action === 'peek') {
-      if (!peekSpecFrom(accelerator)) {
-        reasons.push(t('Hold-to-peek does not support this key yet', '长按监听暂不支持这个按键'))
+    if (HOOK_ACTIONS.has(action)) {
+      if (!keySpecFrom(accelerator)) {
+        reasons.push(t('Key listener does not support this key yet', '键盘监听暂不支持这个按键'))
       }
       if (process.platform === 'darwin' && !systemPreferences.isTrustedAccessibilityClient(false)) {
         reasons.push(t('Waiting for Accessibility permission', '等待辅助功能权限'))
-      } else if (!peekHookStarted) {
+      } else if (!keyboardHookStarted) {
         reasons.push(
-          peekHookError
-            ? t(`Hold listener failed: ${peekHookError}`, `长按监听启动失败：${peekHookError}`)
-            : t('Hold listener has not started', '长按监听未启动')
+          keyboardHookError
+            ? t(
+                `Key listener failed: ${keyboardHookError}`,
+                `键盘监听启动失败：${keyboardHookError}`
+              )
+            : t('Key listener has not started', '键盘监听未启动')
         )
       }
     }
@@ -450,6 +577,6 @@ export function registerShortcuts(): void {
     }
   })
   bindAll()
-  setupPeekKey()
+  setupKeyboardHook()
   app.on('will-quit', () => globalShortcut.unregisterAll())
 }

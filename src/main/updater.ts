@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 依赖 electron-updater、electron app/Notification、store 的自动检查节流时间
- * [OUTPUT]: 对外提供 updater 状态、手动检查/下载/安装、启动后每日自动检查
+ * [OUTPUT]: 对外提供 updater 状态、手动检查/下载/安装、手动检查结果文案、启动后每日自动检查
  * [POS]: main 的更新层；renderer 只看状态和发命令，下载/安装只在主进程发生
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */

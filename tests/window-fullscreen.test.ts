@@ -42,6 +42,8 @@ const electron = vi.hoisted(() => {
   }
 
   class MockWebContentsView {
+    static last: MockWebContentsView | null = null
+
     webContents = {
       setWindowOpenHandler: vi.fn(),
       on: vi.fn(),
@@ -50,6 +52,10 @@ const electron = vi.hoisted(() => {
     }
 
     setBounds = vi.fn()
+
+    constructor() {
+      MockWebContentsView.last = this
+    }
   }
 
   return {
@@ -160,5 +166,24 @@ describe('window fullscreen visibility', () => {
     setEditingLevel(true)
 
     expect(win.setAlwaysOnTop).not.toHaveBeenCalled()
+  })
+
+  it('全屏中开启穿透会先退出全屏，再应用穿透透明度', async () => {
+    const { createFloatWindow, toggleWindowFullscreen, setPassthrough } =
+      await import('../src/main/window')
+
+    createFloatWindow('https://example.com/watch')
+    const win = electron.MockBaseWindow.last!
+    const view = electron.MockWebContentsView.last!
+
+    toggleWindowFullscreen()
+    win.setFullScreen.mockClear()
+
+    setPassthrough(true)
+
+    expect(win.setFullScreen).toHaveBeenCalledWith(false)
+    expect(view.webContents.send).toHaveBeenCalledWith('page:exit-video-fullscreen')
+    expect(win.setOpacity).toHaveBeenLastCalledWith(0.55)
+    expect(view.webContents.send).toHaveBeenCalledWith('state:passthrough', true)
   })
 })

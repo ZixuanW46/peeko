@@ -41,6 +41,12 @@ export interface UpdatePrimaryAction {
   label: string
 }
 
+export interface UpdateManualCheckResult {
+  kind: 'info' | 'error'
+  message: string
+  detail: string
+}
+
 const clampProgress = (value: number): number => Math.max(0, Math.min(100, Math.round(value)))
 const progressText = (state: UpdateState): string => `${state.progress ?? 0}%`
 
@@ -259,5 +265,66 @@ export function updateStatusText(state: UpdateState, language: UpdateLanguage): 
       return 'Update downloaded. Restart to install.'
     case 'error':
       return updateErrorText(state.error, language)
+  }
+}
+
+export function updateManualCheckResult(
+  state: UpdateState,
+  language: UpdateLanguage
+): UpdateManualCheckResult {
+  const latest = state.latestVersion ?? state.currentVersion
+  if (language === 'zh') {
+    switch (state.phase) {
+      case 'available':
+        return {
+          kind: 'info',
+          message: `Peeko ${latest} 可更新`,
+          detail: '可以从菜单栏继续下载更新。'
+        }
+      case 'not-available':
+        return {
+          kind: 'info',
+          message: 'Peeko 已是最新版本',
+          detail: `当前版本 ${state.currentVersion}。`
+        }
+      case 'error':
+        return {
+          kind: 'error',
+          message: '更新检查失败',
+          detail: updateErrorText(state.error, language)
+        }
+      default:
+        return {
+          kind: 'info',
+          message: updateStatusText(state, language),
+          detail: ''
+        }
+    }
+  }
+  switch (state.phase) {
+    case 'available':
+      return {
+        kind: 'info',
+        message: `Peeko ${latest} is available`,
+        detail: 'You can continue downloading it from the menu bar.'
+      }
+    case 'not-available':
+      return {
+        kind: 'info',
+        message: 'Peeko is up to date',
+        detail: `Current version ${state.currentVersion}.`
+      }
+    case 'error':
+      return {
+        kind: 'error',
+        message: 'Update check failed',
+        detail: updateErrorText(state.error, language)
+      }
+    default:
+      return {
+        kind: 'info',
+        message: updateStatusText(state, language),
+        detail: ''
+      }
   }
 }

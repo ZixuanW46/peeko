@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 依赖 electron 的 Tray/BrowserWindow/Menu/clipboard，./runtime 门闩，./modes 模式切换，./store 收藏夹，./window 可见性门闩，./liquid-glass 原生材质
- * [OUTPUT]: 对外提供 createTray()、refreshTray()——菜单栏图标与 macOS 26 Liquid Glass popover（内容自适应高度）
+ * [OUTPUT]: 对外提供 createTray()、refreshTray()——菜单栏图标、macOS 26 Liquid Glass popover、手动更新反馈
  * [POS]: main 的托盘层，应用唯一的常驻可见入口（隐蔽性要求：glyph 伪装系统图标）
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -11,6 +11,7 @@ import {
   app,
   clipboard,
   ipcMain,
+  dialog,
   nativeImage,
   screen,
   type MenuItemConstructorOptions
@@ -28,6 +29,7 @@ import {
   updateTrayCommand,
   updateTrayEnabled,
   updateTrayLabel,
+  updateManualCheckResult,
   type UpdateState
 } from '../shared/updater'
 
@@ -219,7 +221,7 @@ async function runCommand(action: string, payload?: unknown): Promise<TrayState>
       openSettings()
       break
     case 'update-check':
-      await checkForUpdates(true)
+      await showManualUpdateResult(await checkForUpdates(true))
       break
     case 'update-download':
       await downloadUpdate()
@@ -234,6 +236,18 @@ async function runCommand(action: string, payload?: unknown): Promise<TrayState>
   const next = trayState()
   sendTrayState()
   return next
+}
+
+async function showManualUpdateResult(update: UpdateState): Promise<void> {
+  const language = getLanguageSettings().resolved
+  const result = updateManualCheckResult(update, language)
+  await dialog.showMessageBox({
+    type: result.kind,
+    buttons: [language === 'zh' ? '知道了' : 'OK'],
+    defaultId: 0,
+    message: result.message,
+    detail: result.detail
+  })
 }
 
 function buildMenu(): Menu {

@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 依赖 electron 的 screen，./window 浮窗单例，./store 几何持久化，./sites 注入执行器
- * [OUTPUT]: 对外提供 enterCinema/exitCinema/toggleCinema/isCinema/setManualExit
+ * [OUTPUT]: 对外提供 enterCinema/exitCinema/toggleCinema/isCinema 与浏览语义视频全屏编排
  * [POS]: main 的模式编排层——浏览⇄观影的唯一切换通道
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -10,7 +10,9 @@ import {
   exitWindowFullscreen,
   getFloat,
   isWindowFullscreen,
-  setBoundsSink
+  setPassthrough,
+  setBoundsSink,
+  toggleWindowFullscreen
 } from './window'
 import { store, type Bounds } from './store'
 import { injectRule, ejectRule } from './sites/index'
@@ -50,9 +52,14 @@ export async function enterCinema(): Promise<void> {
   f.pageView.webContents.send('mode:cinema', true)
 }
 
-export async function exitCinema(byUser = false): Promise<void> {
+export async function exitCinema(byUser = false, refreshLayer = true): Promise<void> {
   const f = getFloat()
   if (!f || !cinema) return
+  const wasFullscreen = isWindowFullscreen()
+  const wasVisible = f.win.isVisible()
+  const shouldRefreshLayer = refreshLayer && !wasFullscreen && wasVisible
+  setPassthrough(false)
+  if (shouldRefreshLayer) f.win.hide()
   exitWindowFullscreen()
   cinema = false
   manualExit = byUser
@@ -61,9 +68,57 @@ export async function exitCinema(byUser = false): Promise<void> {
   f.pageView.webContents.send('mode:cinema', false)
   const back = store.data.browseBounds
   if (back) f.win.setBounds(clampBounds(back))
+  if (shouldRefreshLayer) setTimeout(() => f.win.showInactive(), 30)
 }
 
 export const toggleCinema = (): Promise<void> => (cinema ? exitCinema(true) : enterCinema())
+
+const JS_REQUEST_VIDEO_FULLSCREEN = `(() => {
+  const allVideos = (root, acc = []) => {
+    root.querySelectorAll?.('video').forEach(v => acc.push(v))
+    root.querySelectorAll?.('*').forEach(el => {
+      if (el.shadowRoot) allVideos(el.shadowRoot, acc)
+    })
+    return acc
+  }
+  const area = (el) => {
+    const r = el.getBoundingClientRect()
+    return r.width * r.height
+  }
+  const v = allVideos(document).sort((a, b) => area(b) - area(a))[0]
+  if (!v?.requestFullscreen) return false
+  const vr = v.getBoundingClientRect()
+  const videoArea = Math.max(1, vr.width * vr.height)
+  let target = v
+  for (let n = v.parentElement; n && n !== document.body && n !== document.documentElement; n = n.parentElement) {
+    const r = n.getBoundingClientRect()
+    const parentArea = r.width * r.height
+    if (r.width >= vr.width * .9 && r.height >= vr.height * .9 && parentArea <= videoArea * 6) target = n
+  }
+  const req = target.requestFullscreen ?? v.requestFullscreen
+  return Promise.resolve(req.call(target, { navigationUI: 'hide' })).then(() => true).catch(() => false)
+})()`
+
+function requestVideoFullscreen(): void {
+  getFloat()
+    ?.pageView.webContents.executeJavaScript(JS_REQUEST_VIDEO_FULLSCREEN, true)
+    .catch(() => {})
+}
+
+export function exitPlaybackFullscreen(): void {
+  getFloat()?.pageView.webContents.send('page:exit-video-fullscreen')
+  exitWindowFullscreen()
+}
+
+export async function togglePlaybackFullscreen(): Promise<void> {
+  if (!getFloat()) return
+  if (isWindowFullscreen()) {
+    exitPlaybackFullscreen()
+    return
+  }
+  if (cinema) await exitCinema(true, false)
+  if (toggleWindowFullscreen()) requestVideoFullscreen()
+}
 
 // ============================================================
 // intro 模式演示几何：浏览大窗(左上) vs 观影小窗(右下)，拉开位置尺寸对比。

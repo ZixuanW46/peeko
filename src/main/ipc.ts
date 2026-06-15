@@ -35,6 +35,8 @@ import {
   exitCinema,
   autoEnterCinema,
   toggleCinema,
+  togglePlaybackFullscreen,
+  exitPlaybackFullscreen,
   setIntroDemoGeometry,
   snapshotBoundsForIntro,
   restoreBoundsAfterIntro
@@ -44,6 +46,7 @@ import {
   toggleMute,
   rebindShortcuts,
   dispatchHideToggle,
+  dispatchBoss,
   prepareDemo,
   getShortcutFailures,
   getShortcutHealth,
@@ -81,6 +84,10 @@ function broadcastLanguage(): void {
   getFloat()?.pageView.webContents.send('i18n:language', language)
   getOnboarding()?.webContents.send('i18n:language', language)
   refreshTray()
+}
+
+function broadcastShortcuts(): void {
+  getFloat()?.pageView.webContents.send('shortcuts:changed', store.data.shortcuts)
 }
 
 export function registerIpc(): void {
@@ -121,11 +128,12 @@ export function registerIpc(): void {
   ipcMain.on('ctrl:mode', () => void toggleCinema())
   ipcMain.on('ctrl:passthrough', () => togglePassthrough())
   ipcMain.on('ctrl:hide', () => dispatchHideToggle())
+  ipcMain.on('ctrl:boss', () => dispatchBoss())
   ipcMain.on('ctrl:settings', () => openSettings())
   ipcMain.on('ctrl:quit', () => app.quit())
   ipcMain.on('ctrl:home', () => getFloat()?.pageView.webContents.loadURL(HOME_URL))
-  ipcMain.on('ctrl:fullscreen', () => toggleWindowFullscreen())
-  ipcMain.on('ctrl:exit-fullscreen', () => exitWindowFullscreen())
+  ipcMain.on('ctrl:fullscreen', () => void togglePlaybackFullscreen())
+  ipcMain.on('ctrl:exit-fullscreen', () => exitPlaybackFullscreen())
 
   // 音量滑条拖动时确保可听：解除 Chromium 级静音并回推状态
   ipcMain.on('ctrl:audible', () => {
@@ -212,6 +220,7 @@ export function registerIpc(): void {
   ipcMain.handle('settings:reset-shortcuts', () => {
     store.patch({ shortcuts: { ...DEFAULT_SHORTCUTS } })
     rebindShortcuts()
+    broadcastShortcuts()
     return { shortcuts: store.data.shortcuts, shortcutHealth: getShortcutHealth() }
   })
 
@@ -265,7 +274,7 @@ export function registerIpc(): void {
       browseBounds: null,
       cinemaBounds: null,
       shortcuts: { ...DEFAULT_SHORTCUTS },
-      autoCinema: true,
+      autoCinema: false,
       passthroughOpacity: 0.55,
       showInDock: false,
       language: 'system'
@@ -273,6 +282,7 @@ export function registerIpc(): void {
     setDockVisibility(false)
     rebindShortcuts()
     broadcastLanguage()
+    broadcastShortcuts()
     return {
       shortcuts: store.data.shortcuts,
       autoCinema: store.data.autoCinema,
@@ -327,7 +337,11 @@ export function registerIpc(): void {
   })
   ipcMain.handle('onboarding:should-run-intro', () => shouldRunOnboardingIntro())
   ipcMain.handle('onboarding:shortcut-health', () => getShortcutHealth())
-  ipcMain.handle('onboarding:apply-recommended-shortcuts', () => applyRecommendedShortcuts())
+  ipcMain.handle('onboarding:apply-recommended-shortcuts', () => {
+    const result = applyRecommendedShortcuts()
+    broadcastShortcuts()
+    return result
+  })
   ipcMain.on('onboarding:prep', (_e, target: 'NORMAL' | 'HIDDEN') => {
     prepareDemo(target)
     raiseOnboarding()
@@ -370,9 +384,11 @@ export function registerIpc(): void {
   ipcMain.handle('settings:probe-shortcut', (_e, action: Action, accelerator: string) =>
     probeShortcut(action, accelerator)
   )
-  ipcMain.handle('settings:set-shortcut', (_e, action: Action, accelerator: string) =>
-    setShortcut(action, accelerator)
-  )
+  ipcMain.handle('settings:set-shortcut', (_e, action: Action, accelerator: string) => {
+    const result = setShortcut(action, accelerator)
+    if (result.ok) broadcastShortcuts()
+    return result
+  })
 
   ipcMain.handle('settings:remove-favorite', (_e, url: string) => {
     store.patch({ favorites: store.data.favorites.filter((f) => f.url !== url) })

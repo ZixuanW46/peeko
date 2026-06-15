@@ -186,9 +186,15 @@ function actionLabel(action: string): string {
     boss: t('Boss key', '老板键'),
     playpause: t('Play / pause', '播放 / 暂停'),
     mute: t('Mute', '静音'),
+    volumeUp: t('Volume up', '音量增加'),
+    volumeDown: t('Volume down', '音量降低'),
     mode: t('Cinema / browse mode', '观影 / 浏览模式'),
     passthrough: t('Click-through', '鼠标穿透'),
-    fullscreen: t('Peeko window fullscreen', 'Peeko 窗口全屏')
+    fullscreen: t('Video fullscreen', '视频全屏'),
+    opacityUp: t('Click-through opacity up', '穿透不透明度增加'),
+    opacityDown: t('Click-through opacity down', '穿透不透明度降低'),
+    seekBack: t('Seek backward', '快退'),
+    seekForward: t('Seek forward', '快进')
   }
   return labels[action] ?? action
 }
@@ -738,7 +744,7 @@ function makeLegend(): LegendItem[] {
     { icon: 'play', label: t('Play / pause', '播放 / 暂停') },
     { icon: 'vol', label: t('Mute · hover for volume', '静音 · 悬停出音量条') },
     { icon: 'cinema', label: t('Cinema ⇄ browse mode', '观影 ⇄ 浏览模式') },
-    { icon: 'expand', label: t('Peeko fullscreen · Esc to exit', 'Peeko 窗口全屏 · Esc 退出') },
+    { icon: 'expand', label: t('Video fullscreen · Esc to exit', '视频全屏 · Esc 退出') },
     { icon: 'gear', label: t('Settings', '设置') },
     { icon: 'pointer', label: t('Ghost mode (click-through)', '穿透模式') },
     { icon: 'hand', label: t('Drag handle — move window', '拖把手：移动窗口') },
@@ -788,6 +794,8 @@ const PRETTY_KEY: Record<string, string> = {
 function makeCheats(): { action: string; label: string }[] {
   return [
     { action: 'mute', label: t('Mute / unmute the sound', '静音 / 取消静音') },
+    { action: 'volumeUp', label: t('Volume up', '音量增大') },
+    { action: 'volumeDown', label: t('Volume down', '音量减小') },
     { action: 'hide', label: t('Hide the picture — sound keeps playing', '隐藏画面，声音继续放') },
     {
       action: 'peek',
@@ -807,11 +815,19 @@ function makeCheats(): { action: string; label: string }[] {
         '穿透模式：鼠标点击穿到下层应用'
       )
     },
+    {
+      action: 'opacityUp',
+      label: t('Click-through opacity up', '穿透时提高不透明度')
+    },
+    {
+      action: 'opacityDown',
+      label: t('Click-through opacity down', '穿透时降低不透明度')
+    },
     { action: 'playpause', label: t('Play / pause', '播放 / 暂停') },
     { action: 'mode', label: t('Cinema / browse mode', '观影 / 浏览模式') },
     {
       action: 'fullscreen',
-      label: t('Peeko window fullscreen (Esc to exit)', 'Peeko 窗口全屏（Esc 退出）')
+      label: t('Video fullscreen (Esc to exit)', '视频全屏（Esc 退出）')
     }
   ]
 }
@@ -1063,21 +1079,21 @@ function makeModeGuides(): ModeGuide[] {
     },
     {
       mode: 'window-fullscreen-info',
-      title: t('Peeko Window Fullscreen', 'Peeko 窗口全屏'),
+      title: t('Video Fullscreen', '视频全屏'),
       keys: shortcutKeys('fullscreen'),
       hint: t(
-        `Press ${shortcutText('fullscreen')} to use Peeko like a normal fullscreen player.`,
-        `按 ${shortcutText('fullscreen')}，Peeko 会像普通播放器一样全屏。`
+        `Press ${shortcutText('fullscreen')} to make Peeko and the video fill the screen.`,
+        `按 ${shortcutText('fullscreen')}，Peeko 和视频一起进入全屏。`
       ),
-      fact: t('Esc exits Peeko window fullscreen.', 'Esc 退出 Peeko 窗口全屏。')
+      fact: t('Esc exits video fullscreen.', 'Esc 退出视频全屏。')
     },
     {
       mode: 'web-fullscreen-info',
       title: t('Website Player Fullscreen', '网页播放器全屏'),
       keys: [],
       hint: t(
-        'This is the fullscreen button inside the video website. It is different from Peeko fullscreen.',
-        '这是视频网站播放器自己的全屏按钮，和 Peeko 窗口全屏不是一回事。'
+        'This is the fullscreen button inside the video website. Peeko allows it and uses the same player layer.',
+        '这是视频网站播放器自己的全屏按钮。Peeko 会允许它，并使用同一层播放器全屏。'
       ),
       fact: t('Peeko allows website fullscreen requests.', 'Peeko 会允许网页播放器自己的全屏请求。')
     }

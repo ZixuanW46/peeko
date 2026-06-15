@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 依赖 electron 的 BaseWindow/WebContentsView/session，依赖 ./store 的几何与 lastUrl，依赖 ./liquid-glass 设置窗材质
- * [OUTPUT]: 对外提供 createFloatWindow()、float 单例、可见性门闩、原生全屏、onboarding 层级与权限窗切换、Liquid Glass 设置窗
+ * [OUTPUT]: 对外提供 createFloatWindow()、float 单例、可见性门闩、原生全屏、穿透透明度、onboarding 层级与权限窗切换、Liquid Glass 设置窗
  * [POS]: main 的窗口核心——置顶浮窗 + 网页视图装配，全项目技术风险的承载点
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -88,15 +88,26 @@ function applyMouseIgnore(): void {
   float?.win.setIgnoreMouseEvents(passthrough && !barHovering, { forward: true })
 }
 
+function sendPassthroughState(): void {
+  float?.pageView.webContents.send('state:passthrough', passthrough)
+  float?.pageView.webContents.send('state:passthrough-opacity', store.data.passthroughOpacity)
+}
+
 export function togglePassthrough(): boolean {
   return setPassthrough(!passthrough)
 }
 
 export function setPassthrough(on: boolean): boolean {
+  if (!on) barHovering = false
+  if (on && fullscreen) exitWindowFullscreen()
   passthrough = on
   applyMouseIgnore()
   float?.win.setOpacity(passthrough ? store.data.passthroughOpacity : 1)
-  float?.pageView.webContents.send('state:passthrough', passthrough)
+  sendPassthroughState()
+  return passthrough
+}
+
+export function isPassthrough(): boolean {
   return passthrough
 }
 
@@ -105,6 +116,12 @@ export function setPassthroughOpacity(value: number): void {
   const v = Math.min(0.9, Math.max(0.1, value))
   store.patch({ passthroughOpacity: v })
   if (passthrough) float?.win.setOpacity(v)
+  sendPassthroughState()
+}
+
+export function adjustPassthroughOpacity(delta: number): number {
+  setPassthroughOpacity(store.data.passthroughOpacity + delta)
+  return store.data.passthroughOpacity
 }
 
 export function setBarHover(hovering: boolean): void {
@@ -173,6 +190,7 @@ export function isWindowFullscreen(): boolean {
 
 export function exitWindowFullscreen(): boolean {
   if (!float || !fullscreen) return false
+  float.pageView.webContents.send('page:exit-video-fullscreen')
   float.win.setFullScreen(false)
   return true
 }
@@ -183,7 +201,7 @@ export function toggleWindowFullscreen(): boolean {
 
   fullscreenRestoreBounds = float.win.getBounds()
   hideAfterFullscreenExit = false
-  if (passthrough) togglePassthrough()
+  if (passthrough) setPassthrough(false)
   fullscreen = true
   float.win.setIgnoreMouseEvents(false)
   float.win.setAlwaysOnTop(false)
@@ -290,6 +308,7 @@ export function createFloatWindow(initialUrl?: string): Float {
   })
   pageView.webContents.on('did-finish-load', () => {
     sendFullscreenState()
+    sendPassthroughState()
   })
 
   // 页面侧故障显影：渲染进程崩溃与页面级错误必须留痕

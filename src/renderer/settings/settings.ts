@@ -105,9 +105,15 @@ function actionLabel(action: string): string {
     boss: t('Boss key (single press hides / double press quits)', '老板键（单击潜伏 / 双击退出）'),
     playpause: t('Play / pause', '播放 / 暂停'),
     mute: t('Mute toggle', '静音切换'),
+    volumeUp: t('Volume up', '音量增加'),
+    volumeDown: t('Volume down', '音量降低'),
     mode: t('Cinema / browse mode', '观影 / 浏览模式'),
     passthrough: t('Click-through', '鼠标穿透'),
-    fullscreen: t('Peeko window fullscreen', 'Peeko 窗口全屏')
+    fullscreen: t('Video fullscreen', '视频全屏'),
+    opacityUp: t('Click-through opacity up', '穿透不透明度增加'),
+    opacityDown: t('Click-through opacity down', '穿透不透明度降低'),
+    seekBack: t('Seek backward', '快退'),
+    seekForward: t('Seek forward', '快进')
   }
   return labels[action] ?? action
 }
