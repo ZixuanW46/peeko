@@ -5,7 +5,7 @@
 <h1 align="center">Peeko</h1>
 
 <p align="center">
-  <strong>Live in the corner. Gone in a keystroke.</strong>
+  <strong>Keep working. Keep half-watching.</strong>
 </p>
 
 <p align="center">

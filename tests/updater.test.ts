@@ -126,4 +126,21 @@ describe('update state machine', () => {
       detail: '更新源尚未发布'
     })
   })
+
+  it('安装包缺少 app-update.yml 时不暴露文件系统路径', () => {
+    const raw =
+      "ENOENT: no such file or directory, open '/Applications/Peeko.app/Contents/Resources/app-update.yml'"
+    const state = reduceUpdateState(createInitialUpdateState('0.1.1'), {
+      type: 'ERROR',
+      error: raw
+    })
+
+    expect(updateErrorText(raw, 'zh')).toBe('当前安装包缺少更新配置')
+    expect(updateStatusText(state, 'en')).toBe('This build is missing update configuration')
+    expect(updateManualCheckResult(state, 'zh')).toEqual({
+      kind: 'error',
+      message: '更新检查失败',
+      detail: '当前安装包缺少更新配置'
+    })
+  })
 })

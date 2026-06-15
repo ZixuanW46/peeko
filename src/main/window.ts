@@ -477,7 +477,8 @@ export function openSettings(): void {
     show: false,
     webPreferences: { preload: join(__dirname, '../preload/ui.js') }
   })
-  settings.setAlwaysOnTop(true, 'screen-saver')
+  // 输入法候选窗要能压过设置窗；screen-saver 会盖住 macOS IME。
+  settings.setAlwaysOnTop(true, 'floating')
   settings.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
   const dev = process.env['ELECTRON_RENDERER_URL']
   if (dev) settings.loadURL(`${dev}/settings/index.html`)

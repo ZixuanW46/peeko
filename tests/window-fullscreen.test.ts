@@ -58,8 +58,35 @@ const electron = vi.hoisted(() => {
     }
   }
 
+  class MockBrowserWindow {
+    static last: MockBrowserWindow | null = null
+
+    private handlers = new Map<string, Array<(...args: unknown[]) => void>>()
+
+    setAlwaysOnTop = vi.fn()
+    setVisibleOnAllWorkspaces = vi.fn()
+    loadURL = vi.fn()
+    loadFile = vi.fn()
+    show = vi.fn()
+    moveTop = vi.fn()
+    focus = vi.fn()
+    once = vi.fn((event: string, handler: (...args: unknown[]) => void) => {
+      this.handlers.set(event, [...(this.handlers.get(event) ?? []), handler])
+      return this
+    })
+    on = vi.fn((event: string, handler: (...args: unknown[]) => void) => {
+      this.handlers.set(event, [...(this.handlers.get(event) ?? []), handler])
+      return this
+    })
+
+    constructor() {
+      MockBrowserWindow.last = this
+    }
+  }
+
   return {
     MockBaseWindow,
+    MockBrowserWindow,
     MockWebContentsView,
     appGetPath: vi.fn(() => '/tmp/peeko-test-user-data'),
     screenOn: vi.fn()
@@ -69,7 +96,7 @@ const electron = vi.hoisted(() => {
 vi.mock('electron', () => ({
   app: { getPath: electron.appGetPath },
   BaseWindow: electron.MockBaseWindow,
-  BrowserWindow: vi.fn(),
+  BrowserWindow: electron.MockBrowserWindow,
   WebContentsView: electron.MockWebContentsView,
   screen: {
     getAllDisplays: () => [{ workArea: { x: 0, y: 0, width: 1440, height: 900 } }],
@@ -166,6 +193,14 @@ describe('window fullscreen visibility', () => {
     setEditingLevel(true)
 
     expect(win.setAlwaysOnTop).not.toHaveBeenCalled()
+  })
+
+  it('设置窗使用 floating 层级，避免盖住输入法候选窗', async () => {
+    const { openSettings } = await import('../src/main/window')
+
+    openSettings()
+
+    expect(electron.MockBrowserWindow.last!.setAlwaysOnTop).toHaveBeenCalledWith(true, 'floating')
   })
 
   it('全屏中开启穿透会先退出全屏，再应用穿透透明度', async () => {

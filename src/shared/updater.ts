@@ -175,6 +175,16 @@ export function updateErrorText(error: string | null, language: UpdateLanguage):
   const raw = error?.trim() ?? ''
   const normalized = raw.toLowerCase()
   if (!raw) return language === 'zh' ? '更新检查失败' : 'Update check failed'
+  if (
+    normalized.includes('app-update.yml') ||
+    normalized.includes('dev-app-update.yml') ||
+    (normalized.includes('update config') && normalized.includes('not found')) ||
+    (normalized.includes('enoent') && normalized.includes('update'))
+  ) {
+    return language === 'zh'
+      ? '当前安装包缺少更新配置'
+      : 'This build is missing update configuration'
+  }
   if (/\b404\b/.test(raw) || normalized.includes('not found')) {
     return language === 'zh' ? '更新源尚未发布' : 'Update feed is not published yet'
   }

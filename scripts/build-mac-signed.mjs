@@ -22,6 +22,7 @@ const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
 const version = pkg.version
 const productName = pkg.productName ?? 'Peeko'
 const packageName = pkg.name ?? 'peeko'
+const updateFeed = readUpdateFeedConfig()
 const dist = join(root, 'dist')
 const out = join(root, 'out')
 const app = join(dist, 'mac-arm64', `${productName}.app`)
@@ -78,6 +79,51 @@ function assertFile(file) {
   if (!existsSync(file)) throw new Error(`Missing macOS artifact: ${file}`)
 }
 
+function firstPublishConfig(config) {
+  if (Array.isArray(config)) return config[0]
+  return config
+}
+
+function readUpdateFeedConfig() {
+  const config = yaml.load(readFileSync(join(root, 'electron-builder.yml'), 'utf8'))
+  const publish = firstPublishConfig(config.publish)
+  if (!publish || publish.provider !== 'github' || !publish.owner || !publish.repo) {
+    throw new Error('macOS release requires publish.provider/owner/repo for electron-updater.')
+  }
+  return {
+    provider: publish.provider,
+    owner: publish.owner,
+    repo: publish.repo,
+    releaseType: publish.releaseType ?? 'release'
+  }
+}
+
+function appUpdateFile(appPath) {
+  return join(appPath, 'Contents', 'Resources', 'app-update.yml')
+}
+
+function assertAppUpdateMetadata(appPath) {
+  const file = appUpdateFile(appPath)
+  assertFile(file)
+
+  const doc = yaml.load(readFileSync(file, 'utf8'))
+  for (const [key, value] of Object.entries(updateFeed)) {
+    if (doc?.[key] !== value) {
+      throw new Error(`Invalid ${basename(file)} ${key}: expected ${value}, got ${doc?.[key]}`)
+    }
+  }
+  if (!doc.updaterCacheDirName) throw new Error(`Invalid ${basename(file)}: missing updaterCacheDirName`)
+}
+
+function assertLatestMetadata() {
+  const doc = yaml.load(readFileSync(latest, 'utf8'))
+  if (doc?.version !== version) {
+    throw new Error(`Invalid ${basename(latest)} version: expected ${version}, got ${doc?.version}`)
+  }
+  for (const file of doc.files ?? []) assertFile(join(dist, file.url))
+  if (doc.path) assertFile(join(dist, doc.path))
+}
+
 function fileInfo(file) {
   const bytes = readFileSync(file)
   return {
@@ -118,6 +164,8 @@ function buildArtifacts() {
 
 function assertArtifacts() {
   for (const file of [app, dmg, zip, latest]) assertFile(file)
+  assertAppUpdateMetadata(app)
+  assertLatestMetadata()
 }
 
 async function rebuildDmgBlockMap() {
@@ -215,6 +263,7 @@ function signAndNotarizeDmg() {
 }
 
 function verifyApp(appPath) {
+  assertAppUpdateMetadata(appPath)
   run('codesign', ['--verify', '--deep', '--strict', '--verbose=2', appPath])
   run('xcrun', ['stapler', 'validate', appPath])
   run('spctl', ['-a', '-vvv', '-t', 'execute', appPath])
