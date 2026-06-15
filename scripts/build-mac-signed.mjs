@@ -108,16 +108,7 @@ function buildArtifacts() {
   notarizeAndStapleApp()
   run(
     'npx',
-    [
-      'electron-builder',
-      '--mac',
-      'dmg',
-      'zip',
-      '--prepackaged',
-      join(dist, 'mac-arm64'),
-      '--publish',
-      'never'
-    ],
+    ['electron-builder', '--mac', 'dmg', 'zip', '--prepackaged', app, '--publish', 'never'],
     {
       directNetwork: true,
       env: builderEnv()
