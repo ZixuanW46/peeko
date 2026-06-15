@@ -11,6 +11,7 @@ files:
 asarUnpack:
   - resources/**
   - node_modules/uiohook-napi/**
+afterPack: scripts/prune-electron-locales.mjs
 afterSign: scripts/adhoc-sign.mjs
 mac:
   hardenedRuntime: true
