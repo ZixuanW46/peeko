@@ -2,6 +2,7 @@ export type Action =
   | 'hide'
   | 'peek'
   | 'boss'
+  | 'quit'
   | 'playpause'
   | 'mute'
   | 'volumeUp'
@@ -20,6 +21,7 @@ export const DEFAULT_SHORTCUTS: ShortcutMap = {
   hide: 'Control+Z',
   peek: 'Control+X',
   boss: 'Control+C',
+  quit: 'Control+Q',
   playpause: 'Control+P',
   mute: 'Control+M',
   volumeUp: 'Control+Up',

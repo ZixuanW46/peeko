@@ -183,7 +183,8 @@ function actionLabel(action: string): string {
   const labels: Record<string, string> = {
     hide: t('Hide / restore picture', '隐藏 / 恢复画面'),
     peek: t('Hold to peek', '长按临时显示'),
-    boss: t('Boss key', '老板键'),
+    boss: t('Vanish key', 'Vanish 键'),
+    quit: t('Quit Peeko', '退出 Peeko'),
     playpause: t('Play / pause', '播放 / 暂停'),
     mute: t('Mute', '静音'),
     volumeUp: t('Volume up', '音量增加'),
@@ -319,7 +320,6 @@ const EVENT_TO_ACTION: Record<string, string> = {
   hide: 'hide',
   mute: 'mute',
   boss: 'boss',
-  revive: 'boss',
   'peek-down': 'peek',
   'peek-up': 'peek',
   passthrough: 'passthrough'
@@ -461,7 +461,6 @@ interface Challenge {
   retry?: string
   needsAx?: boolean
   legend?: boolean // 第五关：展示工具栏图例
-  revives?: boolean // 老板键关：复活有延迟，按下后提示"恢复中"而非卡住
 }
 
 interface ModeGuide {
@@ -548,31 +547,23 @@ function makeChallenges(): Challenge[] {
       }
     },
     {
-      title: t('The Boss Key', '老板键'),
+      title: t('The Vanish Key', 'Vanish 键'),
       keys: shortcutKeys('boss'),
       phases: [
         {
           hint: t(
-            'Unlike The Vanish — this kills picture AND sound. Press once.',
-            '和"隐藏"不同——这次画面和声音一起消失。按一下试试。'
-          )
-        },
-        {
-          hint: t(
-            'Total silence. Press again (after a beat) to revive everything.',
-            '万籁俱寂。停一拍，再按一下，原地满血复活。'
+            'Hide the picture, mute the sound, and pause instantly. Press once.',
+            '隐藏画面、静音并暂停。按一下试试。'
           )
         }
       ],
       fact: t(
-        '⚡ Press twice fast = quit Peeko entirely. (Disabled during the tour.)',
-        '⚡ 快速连按两下＝彻底退出 Peeko——终极逃生（教学期间已禁用）。'
+        '⚡ To quit Peeko entirely, use Control+Q or Command+Q.',
+        '⚡ 要彻底退出 Peeko，用 Control+Q 或 Command+Q。'
       ),
       prep: 'NORMAL',
-      revives: true,
       on: (a, _m, phase) => {
-        if (a === 'boss' && phase === 0) return 1
-        if (a === 'revive' && phase === 1) return 'done'
+        if (a === 'boss' && phase === 0) return 'done'
         return phase
       }
     },
@@ -694,6 +685,15 @@ const LEGEND_ICONS: Record<string, Shape[]> = {
     ['path', { d: 'M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z' }],
     ['path', { d: 'M13 13l6 6' }]
   ],
+  eyeoff: [
+    [
+      'path',
+      {
+        d: 'M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24'
+      }
+    ],
+    ['line', { x1: '1', y1: '1', x2: '23', y2: '23' }]
+  ],
   x: [
     ['line', { x1: '18', y1: '6', x2: '6', y2: '18' }],
     ['line', { x1: '6', y1: '6', x2: '18', y2: '18' }]
@@ -748,7 +748,7 @@ function makeLegend(): LegendItem[] {
     { icon: 'gear', label: t('Settings', '设置') },
     { icon: 'pointer', label: t('Ghost mode (click-through)', '穿透模式') },
     { icon: 'hand', label: t('Drag handle — move window', '拖把手：移动窗口') },
-    { icon: 'x', label: t('Quit Peeko (top-right)', '退出 Peeko（右上角）') }
+    { icon: 'x', label: t('Vanish: hide + mute + pause', 'Vanish：隐藏画面 + 静音 + 暂停') }
   ]
 }
 
@@ -791,7 +791,13 @@ const PRETTY_KEY: Record<string, string> = {
   RIGHT: '→'
 }
 
-function makeCheats(): { action: string; label: string }[] {
+interface CheatItem {
+  action?: string
+  keys?: string[]
+  label: string
+}
+
+function makeCheats(): CheatItem[] {
   return [
     { action: 'mute', label: t('Mute / unmute the sound', '静音 / 取消静音') },
     { action: 'volumeUp', label: t('Volume up', '音量增大') },
@@ -803,10 +809,12 @@ function makeCheats(): { action: string; label: string }[] {
     },
     {
       action: 'boss',
-      label: t(
-        'Boss key: hide picture & sound. Press twice fast to quit Peeko',
-        '老板键：画面声音全关。快速连按两下＝直接退出 Peeko'
-      )
+      label: t('Vanish key: hide picture, mute sound, and pause', 'Vanish 键：隐藏画面、静音并暂停')
+    },
+    { action: 'quit', label: t('Quit Peeko globally', '全局退出 Peeko') },
+    {
+      keys: ['⌘', 'Q'],
+      label: t('Quit Peeko when Peeko is focused', 'Peeko 被选中时退出 Peeko')
     },
     {
       action: 'passthrough',
@@ -840,7 +848,7 @@ function renderCheats(): void {
     row.className = 'cheat-row'
     const caps = document.createElement('div')
     caps.className = 'cheat-keys'
-    for (const k of shortcutKeys(c.action)) {
+    for (const k of c.keys ?? shortcutKeys(c.action ?? '')) {
       const cap = document.createElement('div')
       cap.className = 'keycap'
       cap.textContent = PRETTY_KEY[k] ?? k
@@ -1009,16 +1017,6 @@ peeko.onDemoKey(async ({ action, mode }) => {
   const c = CHALLENGES[current]
   const next = c.on(action, mode, phase)
   if (next === phase) {
-    // 老板键关 phase 1 再按一下：复活有 ~1.2s 延迟。给键帽脉冲 + 提示"恢复中"，避免被当成卡住
-    if (c.revives && action === 'boss' && phase === 1) {
-      void flashActionKeys(action)
-      setHint(
-        t(
-          'Coming back… a short beat is normal — it is loading, not stuck.',
-          '正在恢复…中间有点延迟是正常的，是在加载、不是卡住。'
-        )
-      )
-    }
     return
   }
 

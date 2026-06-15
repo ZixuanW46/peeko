@@ -359,7 +359,7 @@ document.addEventListener(
       opacity?.panel,
       handle,
       fullscreenBtn,
-      quitBtn
+      vanishBtn
     ]) {
       if (n?.isConnected) root.appendChild(n)
     }
@@ -678,6 +678,9 @@ ipcRenderer.on('state:passthrough-opacity', (_e, value: number) => {
 ipcRenderer.on('state:fullscreen', (_e, on: boolean) => {
   floatFullscreen = on
   updateBar()
+})
+ipcRenderer.on('ui:reveal-control', (_e, control: 'volume' | 'opacity') => {
+  revealControl(control)
 })
 ipcRenderer.on('page:exit-video-fullscreen', () => {
   if (document.fullscreenElement) void document.exitFullscreen().catch(() => {})
@@ -1299,9 +1302,9 @@ function syncSideChromeLayout(): void {
     fullscreenBtn.style.pointerEvents = shown ? 'auto' : 'none'
   }
 
-  if (quitBtn) {
-    quitBtn.style.opacity = shown ? '1' : '0'
-    quitBtn.style.pointerEvents = shown ? 'auto' : 'none'
+  if (vanishBtn) {
+    vanishBtn.style.opacity = shown ? '1' : '0'
+    vanishBtn.style.pointerEvents = shown ? 'auto' : 'none'
   }
 
   if (capHoverTarget && cap.style.opacity !== '0') placeCap(capHoverTarget)
@@ -1318,14 +1321,14 @@ function updateBar(): void {
   }
   if (cinema) closeFavPanel()
   // 模式识别柔光（纯灰阶）：浏览强柔光（乱页面好定位），观影只一点点。
-  // 同一套作用到悬浮条 + 两侧独立按钮（拖把手 / 全屏钮 / 退出钮）
+  // 同一套作用到悬浮条 + 两侧独立按钮（拖把手 / 全屏钮 / Vanish 钮）
   const glow = cinema
     ? '0 4px 16px rgba(0,0,0,.34), 0 0 20px 2px rgba(255,255,255,.3), inset 0 0 0 .5px rgba(255,255,255,.34)'
     : '0 8px 28px rgba(0,0,0,.5), 0 0 16px rgba(255,255,255,.55), 0 0 42px 8px rgba(255,255,255,.32), inset 0 0 0 .5px rgba(255,255,255,.45)'
   bar.pill.style.boxShadow = glow
   if (handle) handle.style.boxShadow = glow
   if (fullscreenBtn) fullscreenBtn.style.boxShadow = glow
-  if (quitBtn) quitBtn.style.boxShadow = glow
+  if (vanishBtn) vanishBtn.style.boxShadow = glow
   // 按钮提示接线（幂等，每个只接一次）
   for (const b of [
     bar.back,
@@ -1341,7 +1344,7 @@ function updateBar(): void {
     wireCap(b)
   if (handle) wireCap(handle)
   if (fullscreenBtn) wireCap(fullscreenBtn)
-  if (quitBtn) wireCap(quitBtn)
+  if (vanishBtn) wireCap(vanishBtn)
   setIcon(bar.back, 'back')
   setIcon(bar.link, 'link')
   setIcon(bar.fav, 'star')
@@ -1431,13 +1434,13 @@ const handle = ((): HTMLElement | null => {
 })()
 
 // ============================================================
-// 老板键叉：右上角悬停浮现的玻璃圆钮——只潜伏，不真正退出
+// Vanish 钮：左上角悬停浮现的玻璃圆钮——隐藏、静音并暂停，不退出进程。
 // ============================================================
-const quitBtn = ((): HTMLElement | null => {
+const vanishBtn = ((): HTMLElement | null => {
   try {
     const q = el(
       'div',
-      `position: fixed; top: 14px; right: 14px; width: 30px; height: 30px;
+      `position: fixed; top: 14px; left: 14px; width: 30px; height: 30px;
        border-radius: 50%; display: flex; align-items: center; justify-content: center;
        color: rgba(255,255,255,.85); cursor: pointer; ${GLASS}
        z-index: 2147483647; opacity: 0;
@@ -1446,7 +1449,7 @@ const quitBtn = ((): HTMLElement | null => {
     )
     q.setAttribute('data-peeko-badge', '')
     q.appendChild(icon('x'))
-    setTip(q, tr('Quick vanish', '一键隐去'))
+    setTip(q, tr('Vanish: hide + mute + pause', 'Vanish：隐藏画面 + 静音 + 暂停'))
     q.addEventListener('mouseenter', (e) => {
       if (!trusted(e)) return
       setSideButtonState(q, true, q.dataset.pressed === '1')
@@ -1540,12 +1543,24 @@ function updateLocalizedChrome(): void {
     if (bar.favPanel.style.display === 'flex') void renderFavPanel()
   }
   if (handle) setTip(handle, tr('Hold and drag window', '按住拖动窗口'))
-  if (quitBtn) setTip(quitBtn, tr('Quick vanish', '一键隐去'))
+  if (vanishBtn)
+    setTip(vanishBtn, tr('Vanish: hide + mute + pause', 'Vanish：隐藏画面 + 静音 + 暂停'))
   updateBar()
 }
 
 let barTimer: ReturnType<typeof setTimeout> | null = null
+let controlRevealTimer: ReturnType<typeof setTimeout> | null = null
 let barVisible = false
+
+function attachChromeRoot(): void {
+  if (!bar) return
+  const root = uiRoot()
+  if (bar.pill.parentElement !== root) root.appendChild(bar.pill)
+  if (handle && handle.parentElement !== root) root.appendChild(handle)
+  if (fullscreenBtn && fullscreenBtn.parentElement !== root) root.appendChild(fullscreenBtn)
+  if (vanishBtn && vanishBtn.parentElement !== root) root.appendChild(vanishBtn)
+  if (cap.parentElement !== root) root.appendChild(cap)
+}
 
 function setBarShown(shown: boolean): void {
   if (!bar) return
@@ -1556,6 +1571,41 @@ function setBarShown(shown: boolean): void {
   bar.pill.style.pointerEvents = shown ? 'auto' : 'none'
   syncSideChromeLayout()
   setOpacityShown(passthroughOn && (shown || opacityHover || opacityDragging))
+}
+
+function revealControl(control: 'volume' | 'opacity'): void {
+  if (!bar) return
+  attachChromeRoot()
+  updateBar()
+  setBarShown(true)
+  ipcRenderer.send('bar:hover', true)
+
+  if (control === 'volume') {
+    if (volHideTimer) clearTimeout(volHideTimer)
+    showVolPanel()
+  } else {
+    setOpacityShown(true)
+  }
+
+  if (barTimer) clearTimeout(barTimer)
+  if (controlRevealTimer) clearTimeout(controlRevealTimer)
+  controlRevealTimer = setTimeout(() => {
+    controlRevealTimer = null
+    const busy =
+      bar.urlInput.style.display === 'block' ||
+      bar.favPanel.style.display === 'flex' ||
+      volHover ||
+      volDragging ||
+      opacityHover ||
+      opacityDragging
+
+    if (control === 'volume' && !volHover && !volDragging && vol) vol.panel.style.display = 'none'
+    if (control === 'opacity' && !opacityHover && !opacityDragging) setOpacityShown(false)
+    if (!busy) {
+      setBarShown(false)
+      ipcRenderer.send('bar:hover', false)
+    }
+  }, 1800)
 }
 
 let pillResizeObserver: ResizeObserver | null = null
@@ -1569,12 +1619,7 @@ window.addEventListener(
   (e) => {
     if (!trusted(e)) return
     if (!bar || dragging) return
-    const root = uiRoot()
-    if (bar.pill.parentElement !== root) root.appendChild(bar.pill)
-    if (handle && handle.parentElement !== root) root.appendChild(handle)
-    if (fullscreenBtn && fullscreenBtn.parentElement !== root) root.appendChild(fullscreenBtn)
-    if (quitBtn && quitBtn.parentElement !== root) root.appendChild(quitBtn)
-    if (cap.parentElement !== root) root.appendChild(cap)
+    attachChromeRoot()
     updateBar()
     setBarShown(true)
     if (barTimer) clearTimeout(barTimer)

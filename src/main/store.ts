@@ -63,7 +63,7 @@ const DEFAULTS: StoreData = {
   autoCinema: false,
   passthroughOpacity: 0.55,
   onboarded: false,
-  showInDock: false,
+  showInDock: true,
   language: 'system',
   lastUpdateCheckAt: null
 }

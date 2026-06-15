@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 依赖 electron 的 Tray/BrowserWindow/Menu/clipboard，./runtime 门闩，./modes 模式切换，./store 收藏夹，./window 可见性门闩，./liquid-glass 原生材质
- * [OUTPUT]: 对外提供 createTray()、refreshTray()——菜单栏图标、macOS 26 Liquid Glass popover、手动更新反馈
- * [POS]: main 的托盘层，应用唯一的常驻可见入口（隐蔽性要求：glyph 伪装系统图标）
+ * [OUTPUT]: 对外提供 createTray()、refreshTray()、installApplicationMenu()——状态栏图标、顶部应用菜单、macOS 26 Liquid Glass popover、手动更新反馈
+ * [POS]: main 的菜单入口层，托盘右键与 macOS 顶部 Peeko 菜单共用同一命令模板
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
 import {
@@ -250,7 +250,7 @@ async function showManualUpdateResult(update: UpdateState): Promise<void> {
   })
 }
 
-function buildMenu(): Menu {
+export function buildPeekoCommandMenuTemplate(): MenuItemConstructorOptions[] {
   const favs = store.data.favorites
   const language = getLanguageSettings().resolved
   const update = getUpdateState()
@@ -264,7 +264,7 @@ function buildMenu(): Menu {
     click: () => removeFavorite(f.url)
   }))
 
-  return Menu.buildFromTemplate([
+  return [
     { label: t('Show / Hide Window', '显示 / 隐藏浮窗'), click: toggleFloat },
     {
       label: t('Toggle Cinema Mode', '观影模式 切换'),
@@ -302,17 +302,50 @@ function buildMenu(): Menu {
       }
     },
     { label: t('Settings…', '设置…'), click: openSettings },
-    { label: t('Quit', '退出'), click: (): void => app.quit() }
-  ])
+    { label: t('Quit', '退出'), accelerator: 'Command+Q', click: (): void => app.quit() }
+  ]
+}
+
+function buildMenu(): Menu {
+  return Menu.buildFromTemplate(buildPeekoCommandMenuTemplate())
+}
+
+export function buildApplicationMenuTemplate(): MenuItemConstructorOptions[] {
+  return [
+    {
+      label: app.name || 'Peeko',
+      submenu: [
+        { role: 'about' },
+        { type: 'separator' },
+        ...buildPeekoCommandMenuTemplate(),
+        { type: 'separator' },
+        { role: 'services', submenu: [] },
+        { type: 'separator' },
+        { role: 'hide' },
+        { role: 'hideOthers' },
+        { role: 'unhide' }
+      ]
+    },
+    { role: 'fileMenu' },
+    { role: 'editMenu' },
+    { role: 'viewMenu' },
+    { role: 'windowMenu' }
+  ]
+}
+
+export function installApplicationMenu(): void {
+  Menu.setApplicationMenu(Menu.buildFromTemplate(buildApplicationMenuTemplate()))
 }
 
 export function refreshTray(): void {
   sendTrayState()
+  installApplicationMenu()
 }
 
 export function createTray(): void {
   const img = nativeImage.createFromPath(join(__dirname, '../../resources/trayTemplate.png'))
   img.setTemplateImage(true)
+  installApplicationMenu()
   tray = new Tray(img)
   tray.setToolTip('')
   tray.on('click', showPanel)

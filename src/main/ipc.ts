@@ -276,10 +276,10 @@ export function registerIpc(): void {
       shortcuts: { ...DEFAULT_SHORTCUTS },
       autoCinema: false,
       passthroughOpacity: 0.55,
-      showInDock: false,
+      showInDock: true,
       language: 'system'
     })
-    setDockVisibility(false)
+    setDockVisibility(true)
     rebindShortcuts()
     broadcastLanguage()
     broadcastShortcuts()

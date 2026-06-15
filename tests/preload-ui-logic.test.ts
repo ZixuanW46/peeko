@@ -38,9 +38,23 @@ describe('preload UI logic', () => {
       volumeDown: 'Control+Down',
       opacityUp: 'Control+Shift+Up',
       opacityDown: 'Control+Shift+Down',
-      fullscreen: 'Alt+Shift+Enter'
+      fullscreen: 'Alt+Shift+Enter',
+      quit: 'Control+Q'
     }
 
+    expect(
+      shouldCapturePageShortcut(
+        {
+          key: 'q',
+          code: 'KeyQ',
+          ctrlKey: true,
+          altKey: false,
+          shiftKey: false,
+          metaKey: false
+        },
+        shortcuts
+      )
+    ).toBe(true)
     expect(
       shouldCapturePageShortcut(
         {

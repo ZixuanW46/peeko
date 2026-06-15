@@ -79,6 +79,10 @@ const electron = vi.hoisted(() => {
       return this
     })
 
+    emit(event: string, ...args: unknown[]): void {
+      for (const handler of this.handlers.get(event) ?? []) handler(...args)
+    }
+
     constructor() {
       MockBrowserWindow.last = this
     }
@@ -195,12 +199,61 @@ describe('window fullscreen visibility', () => {
     expect(win.setAlwaysOnTop).not.toHaveBeenCalled()
   })
 
-  it('设置窗使用 floating 层级，避免盖住输入法候选窗', async () => {
-    const { openSettings } = await import('../src/main/window')
+  it('设置窗打开时主浮窗降到 floating，避免盖住设置窗和输入法候选窗', async () => {
+    const { createFloatWindow, openSettings } = await import('../src/main/window')
 
+    createFloatWindow('https://example.com/watch')
+    const win = electron.MockBaseWindow.last!
+    win.setAlwaysOnTop.mockClear()
     openSettings()
 
+    expect(win.setAlwaysOnTop).toHaveBeenLastCalledWith(true, 'floating')
     expect(electron.MockBrowserWindow.last!.setAlwaysOnTop).toHaveBeenCalledWith(true, 'floating')
+  })
+
+  it('设置窗先打开时，后创建的主浮窗也直接降到 floating', async () => {
+    const { createFloatWindow, openSettings } = await import('../src/main/window')
+
+    openSettings()
+    createFloatWindow('https://example.com/watch')
+    const win = electron.MockBaseWindow.last!
+
+    expect(win.setAlwaysOnTop).toHaveBeenLastCalledWith(true, 'floating')
+  })
+
+  it('设置窗关闭后主浮窗恢复 screen-saver，编辑未结束时继续保持 floating', async () => {
+    const { createFloatWindow, openSettings, setEditingLevel } = await import('../src/main/window')
+
+    createFloatWindow('https://example.com/editor')
+    const win = electron.MockBaseWindow.last!
+    openSettings()
+    const settings = electron.MockBrowserWindow.last!
+
+    win.setAlwaysOnTop.mockClear()
+    setEditingLevel(true)
+    settings.emit('closed')
+
+    expect(win.setAlwaysOnTop).toHaveBeenLastCalledWith(true, 'floating')
+
+    setEditingLevel(false)
+
+    expect(win.setAlwaysOnTop).toHaveBeenLastCalledWith(true, 'screen-saver')
+  })
+
+  it('设置窗打开时退出原生全屏，主浮窗仍保持 floating', async () => {
+    const { createFloatWindow, toggleWindowFullscreen, openSettings } =
+      await import('../src/main/window')
+
+    createFloatWindow('https://example.com/watch')
+    const win = electron.MockBaseWindow.last!
+
+    toggleWindowFullscreen()
+    openSettings()
+    win.setAlwaysOnTop.mockClear()
+
+    win.emit('leave-full-screen')
+
+    expect(win.setAlwaysOnTop).toHaveBeenLastCalledWith(true, 'floating')
   })
 
   it('全屏中开启穿透会先退出全屏，再应用穿透透明度', async () => {
@@ -220,5 +273,24 @@ describe('window fullscreen visibility', () => {
     expect(view.webContents.send).toHaveBeenCalledWith('page:exit-video-fullscreen')
     expect(win.setOpacity).toHaveBeenLastCalledWith(0.55)
     expect(view.webContents.send).toHaveBeenCalledWith('state:passthrough', true)
+  })
+
+  it('退出全屏恢复小窗时重放穿透 surface 不变量', async () => {
+    const { createFloatWindow, toggleWindowFullscreen, setPassthrough } =
+      await import('../src/main/window')
+
+    createFloatWindow('https://example.com/watch')
+    const win = electron.MockBaseWindow.last!
+
+    setPassthrough(true)
+    setPassthrough(false)
+    toggleWindowFullscreen()
+    win.setOpacity.mockClear()
+    win.setIgnoreMouseEvents.mockClear()
+
+    win.emit('leave-full-screen')
+
+    expect(win.setOpacity).toHaveBeenLastCalledWith(1)
+    expect(win.setIgnoreMouseEvents).toHaveBeenLastCalledWith(false, { forward: true })
   })
 })

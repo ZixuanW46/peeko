@@ -21,8 +21,13 @@ if (!app.requestSingleInstanceLock()) {
   app.quit()
 }
 
+export function restoreFromAppShell(): void {
+  if (hasRequiredPermissions() && !hasCriticalShortcutIssues()) ensureRuntimeVisible()
+  else openOnboarding()
+}
+
 app.whenReady().then(() => {
-  // 附件型应用默认无 Dock 图标；设置里可切回普通 Dock 应用。
+  // 默认作为普通 Dock 应用出现；设置里仍可切回纯菜单栏驻留。
   applyDockVisibility()
   registerIpc()
   registerShortcuts()
@@ -36,12 +41,14 @@ app.whenReady().then(() => {
 
 app.on('second-instance', () => {
   // 双击可能同时拉起两个实例：信号到达时本实例可能还没 ready
-  void app.whenReady().then(() => {
-    if (hasRequiredPermissions() && !hasCriticalShortcutIssues()) ensureRuntimeVisible()
-    else openOnboarding()
-  })
+  void app.whenReady().then(restoreFromAppShell)
+})
+
+app.on('activate', () => {
+  // Dock 点击 = 用户在找回窗口；走同一权限/快捷键门闩，缺条件时回到引导。
+  void app.whenReady().then(restoreFromAppShell)
 })
 
 app.on('window-all-closed', () => {
-  // 菜单栏应用：窗口关闭不退出，退出只走老板键双击或托盘菜单
+  // 窗口关闭不退出；退出只走 Quit 快捷键、Command+Q 或菜单。
 })

@@ -4,12 +4,13 @@
  * [POS]: tests 的快捷键运行时守卫，防止全屏隐藏再次绕开 window 生命周期
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const electron = vi.hoisted(() => {
   const uioHandlers = {} as Record<string, Array<(e: unknown) => void>>
   return {
     appOn: vi.fn(),
+    appQuit: vi.fn(),
     register: vi.fn(() => true),
     unregisterAll: vi.fn(),
     isTrustedAccessibilityClient: vi.fn(() => true),
@@ -18,7 +19,8 @@ const electron = vi.hoisted(() => {
       uioHandlers[event] ??= []
       uioHandlers[event].push(cb)
     }),
-    uioStart: vi.fn()
+    uioStart: vi.fn(),
+    uioStop: vi.fn()
   }
 })
 
@@ -42,7 +44,7 @@ const media = vi.hoisted(() => ({
 }))
 
 vi.mock('electron', () => ({
-  app: { on: electron.appOn, quit: vi.fn() },
+  app: { on: electron.appOn, quit: electron.appQuit },
   globalShortcut: {
     register: electron.register,
     unregisterAll: electron.unregisterAll,
@@ -55,7 +57,7 @@ vi.mock('electron', () => ({
 }))
 
 vi.mock('uiohook-napi', () => ({
-  uIOhook: { on: electron.uioOn, start: electron.uioStart, stop: vi.fn() },
+  uIOhook: { on: electron.uioOn, start: electron.uioStart, stop: electron.uioStop },
   UiohookKey: { X: 7, ArrowUp: 57416, ArrowDown: 57424, ArrowLeft: 57419, ArrowRight: 57421 }
 }))
 
@@ -66,6 +68,7 @@ vi.mock('../src/main/store', () => ({
         hide: 'Control+Z',
         peek: 'Control+X',
         boss: 'Control+C',
+        quit: 'Control+Q',
         playpause: 'Control+P',
         mute: 'Control+M',
         volumeUp: 'Control+Up',
@@ -123,6 +126,10 @@ describe('shortcuts effects', () => {
     media.executeJavaScript.mockImplementation(() => Promise.resolve(media.pageMuted))
   })
 
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   it('隐藏动作委托给 window 生命周期层，避免全屏态直接 hide 黑屏', async () => {
     const { registerShortcuts, dispatchHideToggle } = await import('../src/main/shortcuts')
 
@@ -162,6 +169,82 @@ describe('shortcuts effects', () => {
     expect(electron.register).toHaveBeenCalledWith('Control+B', expect.any(Function))
   })
 
+  it('Vanish 只隐藏、静音并暂停，不重绑快捷键或停止 uiohook', async () => {
+    const { registerShortcuts, dispatchBoss } = await import('../src/main/shortcuts')
+
+    registerShortcuts()
+    electron.register.mockClear()
+    electron.unregisterAll.mockClear()
+    electron.uioStop.mockClear()
+    media.executeJavaScript.mockClear()
+
+    dispatchBoss()
+
+    expect(win.hideFloatWindow).toHaveBeenCalledTimes(1)
+    expect(media.setAudioMuted).toHaveBeenCalledWith(true)
+    expect(media.executeJavaScript).toHaveBeenCalledWith(
+      expect.stringContaining('querySelectorAll'),
+      true
+    )
+    expect(electron.unregisterAll).not.toHaveBeenCalled()
+    expect(electron.register).not.toHaveBeenCalled()
+    expect(electron.uioStop).not.toHaveBeenCalled()
+  })
+
+  it('Control+Q 注册为全局退出快捷键', async () => {
+    const { registerShortcuts } = await import('../src/main/shortcuts')
+
+    registerShortcuts()
+
+    const quitHandler = electron.register.mock.calls.find(([acc]) => acc === 'Control+Q')?.[1] as
+      | (() => void)
+      | undefined
+    quitHandler?.()
+
+    expect(electron.register).toHaveBeenCalledWith('Control+Q', expect.any(Function))
+    expect(electron.appQuit).toHaveBeenCalledTimes(1)
+  })
+
+  it('Peek 注册 globalShortcut 吞掉 keydown，keyup 仍由 uiohook 释放', async () => {
+    const { registerShortcuts, dispatchHideToggle } = await import('../src/main/shortcuts')
+
+    registerShortcuts()
+    dispatchHideToggle()
+    win.hideFloatWindow.mockClear()
+    win.showFloatWindow.mockClear()
+
+    const peekHandler = electron.register.mock.calls.find(([acc]) => acc === 'Control+X')?.[1] as
+      | (() => void)
+      | undefined
+    peekHandler?.()
+
+    expect(electron.register).toHaveBeenCalledWith('Control+X', expect.any(Function))
+    expect(win.showFloatWindow).toHaveBeenCalledTimes(1)
+
+    const keyup = electron.uioHandlers.keyup[0] as (e: { keycode: number }) => void
+    keyup({ keycode: 7 })
+
+    expect(win.hideFloatWindow).toHaveBeenCalledTimes(1)
+  })
+
+  it('macOS 系统桌面快捷键会进入健康检查，而不是被当作安全键位', async () => {
+    const { getShortcutHealth, probeShortcut, registerShortcuts } =
+      await import('../src/main/shortcuts')
+
+    registerShortcuts()
+    const seekForward = getShortcutHealth().find((h) => h.action === 'seekForward')!
+    const volumeUp = getShortcutHealth().find((h) => h.action === 'volumeUp')!
+
+    expect(seekForward.ok).toBe(false)
+    expect(seekForward.critical).toBe(false)
+    expect(seekForward.reason).toContain('Mission Control')
+    expect(volumeUp.ok).toBe(false)
+    expect(probeShortcut('seekForward', 'Control+Right')).toEqual({
+      ok: false,
+      reason: 'This shortcut overlaps macOS Mission Control / Spaces'
+    })
+  })
+
   it('方向键动作走 uiohook：音量 5% 步进，透明度用 Ctrl+Shift，快进快退不变', async () => {
     const { registerShortcuts } = await import('../src/main/shortcuts')
 
@@ -188,13 +271,15 @@ describe('shortcuts effects', () => {
     expect(electron.register).not.toHaveBeenCalledWith('Control+Shift+Up', expect.any(Function))
     expect(electron.register).not.toHaveBeenCalledWith('Control+Right', expect.any(Function))
     expect(media.executeJavaScript).toHaveBeenCalledWith(
-      expect.stringContaining('v.volume + 0.05'),
+      expect.stringContaining('v.volume + 0.1'),
       true
     )
     expect(media.executeJavaScript).toHaveBeenCalledWith(
-      expect.stringContaining('v.volume + -0.05'),
+      expect.stringContaining('v.volume + -0.1'),
       true
     )
+    expect(media.send).toHaveBeenCalledWith('ui:reveal-control', 'volume')
+    expect(media.send).toHaveBeenCalledWith('ui:reveal-control', 'opacity')
     expect(media.setAudioMuted).toHaveBeenCalledWith(false)
     expect(media.send).toHaveBeenCalledWith('state:muted', false)
     expect(win.adjustPassthroughOpacity).toHaveBeenNthCalledWith(1, 0.05)

@@ -25,6 +25,8 @@ let fullscreenRestoreBounds: Bounds | null = null
 let hideAfterFullscreenExit = false
 let suppressBoundsPersist = false
 let clampWatchInstalled = false
+let editingFloatLevel = false
+let settingsFloatLevel = false
 
 export const getFloat = (): Float | null => float
 export const PAGE_SESSION_PARTITION = PAGE_PARTITION
@@ -88,6 +90,11 @@ function applyMouseIgnore(): void {
   float?.win.setIgnoreMouseEvents(passthrough && !barHovering, { forward: true })
 }
 
+function applyPassthroughSurface(): void {
+  applyMouseIgnore()
+  float?.win.setOpacity(passthrough ? store.data.passthroughOpacity : 1)
+}
+
 function sendPassthroughState(): void {
   float?.pageView.webContents.send('state:passthrough', passthrough)
   float?.pageView.webContents.send('state:passthrough-opacity', store.data.passthroughOpacity)
@@ -101,8 +108,7 @@ export function setPassthrough(on: boolean): boolean {
   if (!on) barHovering = false
   if (on && fullscreen) exitWindowFullscreen()
   passthrough = on
-  applyMouseIgnore()
-  float?.win.setOpacity(passthrough ? store.data.passthroughOpacity : 1)
+  applyPassthroughSurface()
   sendPassthroughState()
   return passthrough
 }
@@ -115,7 +121,7 @@ export function isPassthrough(): boolean {
 export function setPassthroughOpacity(value: number): void {
   const v = Math.min(0.9, Math.max(0.1, value))
   store.patch({ passthroughOpacity: v })
-  if (passthrough) float?.win.setOpacity(v)
+  if (passthrough) applyPassthroughSurface()
   sendPassthroughState()
 }
 
@@ -129,11 +135,24 @@ export function setBarHover(hovering: boolean): void {
   applyMouseIgnore()
 }
 
-// 输入网址期间降到 floating 层（仍盖普通窗口），让输入法候选窗浮上来；
-// 网页输入框同走这条路；结束输入立刻回 screen-saver 层恢复盖全屏能力
-export function setEditingLevel(editing: boolean): void {
+function applyFloatLevel(): void {
   if (fullscreen) return
-  float?.win.setAlwaysOnTop(true, editing ? 'floating' : 'screen-saver')
+  float?.win.setAlwaysOnTop(
+    true,
+    editingFloatLevel || settingsFloatLevel ? 'floating' : 'screen-saver'
+  )
+}
+
+// 输入网址/网页输入框期间降到 floating 层，让输入法候选窗浮上来；
+// 设置窗打开时也降层，避免主浮窗 screen-saver 盖住设置窗。
+export function setEditingLevel(editing: boolean): void {
+  editingFloatLevel = editing
+  applyFloatLevel()
+}
+
+function setSettingsFloatLevel(open: boolean): void {
+  settingsFloatLevel = open
+  applyFloatLevel()
 }
 
 function setFloatBounds(bounds: Bounds, save = true): void {
@@ -153,11 +172,12 @@ function restoreFloatAfterFullscreen(): void {
   hideAfterFullscreenExit = false
   fullscreen = false
   float.win.setFullScreenable(false)
-  float.win.setAlwaysOnTop(true, 'screen-saver')
+  applyFloatLevel()
   float.win.setVisibleOnAllWorkspaces(true, {
     visibleOnFullScreen: true,
     skipTransformProcessType: true
   })
+  applyPassthroughSurface()
   if (fullscreenRestoreBounds) setFloatBounds(fullscreenRestoreBounds, false)
   fullscreenRestoreBounds = null
   if (shouldHide) float.win.hide()
@@ -340,6 +360,10 @@ export function createFloatWindow(initialUrl?: string): Float {
     fullscreen = false
     fullscreenRestoreBounds = null
     hideAfterFullscreenExit = false
+    editingFloatLevel = false
+    settingsFloatLevel = false
+    passthrough = false
+    barHovering = false
   })
   win.on('enter-full-screen', () => {
     fullscreen = true
@@ -348,6 +372,7 @@ export function createFloatWindow(initialUrl?: string): Float {
   win.on('leave-full-screen', () => restoreFloatAfterFullscreen())
 
   float = { win, pageView }
+  applyFloatLevel()
   return float
 }
 
@@ -460,11 +485,13 @@ let settings: BrowserWindow | null = null
 
 export function openSettings(): void {
   if (settings) {
+    setSettingsFloatLevel(true)
     settings.show()
     settings.moveTop()
     settings.focus()
     return
   }
+  setSettingsFloatLevel(true)
   settings = new BrowserWindow({
     width: 420,
     height: 540,
@@ -492,5 +519,6 @@ export function openSettings(): void {
   })
   settings.on('closed', () => {
     settings = null
+    setSettingsFloatLevel(false)
   })
 }

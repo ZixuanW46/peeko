@@ -45,6 +45,7 @@ export async function enterCinema(): Promise<void> {
   const f = getFloat()
   if (!f || cinema) return
   exitWindowFullscreen()
+  setPassthrough(false)
   cinema = true
   store.patch({ browseBounds: f.win.getBounds() })
   f.win.setBounds(clampBounds(store.data.cinemaBounds ?? defaultCinemaBounds()))

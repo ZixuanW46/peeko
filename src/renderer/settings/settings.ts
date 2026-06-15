@@ -102,7 +102,8 @@ function actionLabel(action: string): string {
   const labels: Record<string, string> = {
     hide: t('Hide / restore picture (audio continues)', '隐藏 / 恢复画面（音频继续）'),
     peek: t('Hold to peek', '长按临时显示'),
-    boss: t('Boss key (single press hides / double press quits)', '老板键（单击潜伏 / 双击退出）'),
+    boss: t('Vanish key (hide + mute + pause)', 'Vanish 键（隐藏 + 静音 + 暂停）'),
+    quit: t('Quit Peeko', '退出 Peeko'),
     playpause: t('Play / pause', '播放 / 暂停'),
     mute: t('Mute toggle', '静音切换'),
     volumeUp: t('Volume up', '音量增加'),

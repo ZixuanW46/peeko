@@ -44,7 +44,9 @@ describe('store 文件命名', () => {
     const { store, STORE_FILE, DEFAULT_SHORTCUTS } = await loadStore()
 
     expect(store.data.shortcuts).toEqual(DEFAULT_SHORTCUTS)
+    expect(store.data.shortcuts.quit).toBe('Control+Q')
     expect(store.data.autoCinema).toBe(false)
+    expect(store.data.showInDock).toBe(true)
 
     store.patch({ onboarded: true })
     vi.advanceTimersByTime(500)
@@ -85,6 +87,7 @@ describe('store 文件命名', () => {
     const { store, DEFAULT_SHORTCUTS } = await loadStore()
 
     expect(store.data.shortcuts).toEqual(DEFAULT_SHORTCUTS)
+    expect(store.data.shortcuts.quit).toBe('Control+Q')
   })
 
   it('上一个全屏默认快捷键继续升级为 Control+Enter', async () => {
@@ -119,5 +122,15 @@ describe('store 文件命名', () => {
 
     expect(store.data.shortcuts.hide).toBe('Command+1')
     expect(store.data.shortcuts.fullscreen).toBe('F11')
+  })
+
+  it('用户显式关闭 Dock 图标时不被默认值迁移覆盖', async () => {
+    writeFileSync(
+      join(electron.userData, 'peeko-store.json'),
+      JSON.stringify({ showInDock: false })
+    )
+    const { store } = await loadStore()
+
+    expect(store.data.showInDock).toBe(false)
   })
 })

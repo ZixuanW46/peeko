@@ -111,6 +111,15 @@ describe('mode fullscreen orchestration', () => {
     )
   })
 
+  it('进入观影模式时关闭穿透，避免半透明但不穿透的假状态', async () => {
+    const { enterCinema } = await import('../src/main/modes')
+
+    await enterCinema()
+
+    expect(win.setPassthrough).toHaveBeenCalledWith(false)
+    expect(f.send).toHaveBeenCalledWith('mode:cinema', true)
+  })
+
   it('退出观影模式时关闭穿透并刷新旧小窗 surface', async () => {
     vi.useFakeTimers()
     const { enterCinema, exitCinema } = await import('../src/main/modes')
