@@ -9,7 +9,7 @@
 import { createHash } from 'node:crypto'
 import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { createRequire } from 'node:module'
 
@@ -29,6 +29,8 @@ const dmg = join(dist, `${packageName}-${version}.dmg`)
 const zip = join(dist, `${productName}-${version}-arm64-mac.zip`)
 const latest = join(dist, 'latest-mac.yml')
 const finalizeOnly = process.argv.includes('--finalize-only')
+const directNotaryNetwork = process.env.PEEKO_NOTARY_DIRECT !== '0'
+const disableS3Acceleration = process.env.PEEKO_NOTARY_S3_ACCELERATION !== '1'
 
 const proxyKeys = [
   'ALL_PROXY',
@@ -97,10 +99,28 @@ function builderEnv() {
 function buildArtifacts() {
   resetGeneratedDirs()
   run('npm', ['run', 'build'])
-  run('npx', ['electron-builder', '--mac', '--publish', 'never'], {
+  run('npx', ['electron-builder', '--mac', 'dir', '--publish', 'never'], {
     directNetwork: true,
     env: builderEnv()
   })
+  notarizeAndStapleApp()
+  run(
+    'npx',
+    [
+      'electron-builder',
+      '--mac',
+      'dmg',
+      'zip',
+      '--prepackaged',
+      join(dist, 'mac-arm64'),
+      '--publish',
+      'never'
+    ],
+    {
+      directNetwork: true,
+      env: builderEnv()
+    }
+  )
 }
 
 function assertArtifacts() {
@@ -121,11 +141,30 @@ function refreshLatestMetadata() {
   writeFileSync(latest, yaml.dump(doc, { lineWidth: 120 }), 'utf8')
 }
 
+function submitForNotary(file) {
+  const args = ['notarytool', 'submit', file, '--keychain-profile', profile, '--wait']
+  if (disableS3Acceleration) args.push('--no-s3-acceleration')
+  run('xcrun', args, { directNetwork: directNotaryNetwork })
+}
+
+function notarizeAndStapleApp() {
+  const tmp = mkdtempSync(join(tmpdir(), 'peeko-app-notary-'))
+  const appZip = join(tmp, `${productName}.zip`)
+  try {
+    run('ditto', ['-c', '-k', '--sequesterRsrc', '--keepParent', basename(app), appZip], {
+      cwd: dirname(app),
+      quiet: true
+    })
+    submitForNotary(appZip)
+    run('xcrun', ['stapler', 'staple', app])
+  } finally {
+    rmSync(tmp, { recursive: true, force: true })
+  }
+}
+
 function signAndNotarizeDmg() {
   run('codesign', ['--sign', identity, '--timestamp', '--force', dmg])
-  run('xcrun', ['notarytool', 'submit', dmg, '--keychain-profile', profile, '--wait'], {
-    directNetwork: true
-  })
+  submitForNotary(dmg)
   run('xcrun', ['stapler', 'staple', dmg])
 }
 

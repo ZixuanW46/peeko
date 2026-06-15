@@ -15,14 +15,14 @@ afterPack: scripts/prune-electron-locales.mjs
 afterSign: scripts/adhoc-sign.mjs
 mac:
   hardenedRuntime: true
-  notarize: true
+  notarize: false
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
   target:
     - dmg
     - zip
-  # Developer ID 证书 + APPLE_KEYCHAIN_PROFILE 存在时，electron-builder 正式签名并公证。
-  # 无证书的本地开发包由 afterSign 钩子补 ad-hoc；正式发布必须看验签结果。
+  # Developer ID 证书存在时 electron-builder 正式签名；公证由 scripts/build-mac-signed.mjs
+  # 手动控制，避免 @electron/notarize 固定 S3 acceleration。无证书本地包由 afterSign 补 ad-hoc。
   extendInfo:
     LSUIElement: true # 菜单栏附件应用：无 Dock 图标
 dmg:
