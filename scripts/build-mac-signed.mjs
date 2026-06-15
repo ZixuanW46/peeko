@@ -31,6 +31,8 @@ const latest = join(dist, 'latest-mac.yml')
 const finalizeOnly = process.argv.includes('--finalize-only')
 const directNotaryNetwork = process.env.PEEKO_NOTARY_DIRECT !== '0'
 const disableS3Acceleration = process.env.PEEKO_NOTARY_S3_ACCELERATION !== '1'
+const notaryTimeoutMs = Number(process.env.PEEKO_NOTARY_TIMEOUT_MINUTES ?? 30) * 60_000
+const notaryPollSeconds = Number(process.env.PEEKO_NOTARY_POLL_SECONDS ?? 20)
 
 const proxyKeys = [
   'ALL_PROXY',
@@ -141,10 +143,63 @@ function refreshLatestMetadata() {
   writeFileSync(latest, yaml.dump(doc, { lineWidth: 120 }), 'utf8')
 }
 
+function parseJsonOutput(res, label) {
+  const text = String(res.stdout || res.stderr || '').trim()
+  try {
+    return JSON.parse(text)
+  } catch {
+    throw new Error(`Unable to parse ${label} JSON output:\n${text}`)
+  }
+}
+
+function waitForNotary(id, file) {
+  const deadline = Date.now() + notaryTimeoutMs
+  while (Date.now() < deadline) {
+    const res = run(
+      'xcrun',
+      ['notarytool', 'info', id, '--keychain-profile', profile, '--output-format', 'json'],
+      {
+        allowFailure: true,
+        directNetwork: directNotaryNetwork,
+        quiet: true
+      }
+    )
+    if (res.status === 0) {
+      const info = parseJsonOutput(res, 'notary info')
+      if (info.status === 'Accepted') {
+        console.log(`  • notary accepted ${basename(file)} (${id})`)
+        return
+      }
+      if (info.status !== 'In Progress') {
+        throw new Error(`Notary submission ${id} for ${file} finished with ${info.status}`)
+      }
+      console.log(`  • notary ${basename(file)} still in progress (${id})`)
+    } else {
+      const detail = String(res.stderr || res.stdout || '').trim()
+      console.log(`  • notary info retry for ${basename(file)} (${id}): ${detail}`)
+    }
+    run('sleep', [String(notaryPollSeconds)], { quiet: true })
+  }
+  throw new Error(`Timed out waiting for notary submission ${id} for ${file}`)
+}
+
 function submitForNotary(file) {
-  const args = ['notarytool', 'submit', file, '--keychain-profile', profile, '--wait']
+  const args = [
+    'notarytool',
+    'submit',
+    file,
+    '--keychain-profile',
+    profile,
+    '--output-format',
+    'json',
+    '--no-wait'
+  ]
   if (disableS3Acceleration) args.push('--no-s3-acceleration')
-  run('xcrun', args, { directNetwork: directNotaryNetwork })
+  const submit = run('xcrun', args, { directNetwork: directNotaryNetwork, quiet: true })
+  const result = parseJsonOutput(submit, 'notary submit')
+  if (!result.id) throw new Error(`Notary submit did not return an id for ${file}`)
+  console.log(`  • notary submitted ${basename(file)} (${result.id})`)
+  waitForNotary(result.id, file)
 }
 
 function notarizeAndStapleApp() {
