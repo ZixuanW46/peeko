@@ -67,9 +67,9 @@ function applyLanguage(next: LanguageSettings): void {
 
 function renderTagline(): void {
   $('tagline').replaceChildren(
-    document.createTextNode(t('Live in the corner.', '栖于角落。')),
+    document.createTextNode('Keep working.'),
     document.createElement('br'),
-    document.createTextNode(t('Gone in a keystroke.', '一键消失。'))
+    document.createTextNode('Keep half-watching.')
   )
 }
 
@@ -191,7 +191,7 @@ function actionLabel(action: string): string {
     volumeDown: t('Volume down', '音量降低'),
     mode: t('Cinema / browse mode', '观影 / 浏览模式'),
     passthrough: t('Click-through', '鼠标穿透'),
-    fullscreen: t('Video fullscreen', '视频全屏'),
+    fullscreen: t('Browser fullscreen', '浏览器全屏'),
     opacityUp: t('Click-through opacity up', '穿透不透明度增加'),
     opacityDown: t('Click-through opacity down', '穿透不透明度降低'),
     seekBack: t('Seek backward', '快退'),
@@ -738,13 +738,13 @@ interface LegendItem {
 function makeLegend(): LegendItem[] {
   return [
     { icon: 'back', label: t('Back to previous page', '返回上一页') },
-    { icon: 'link', label: t('Copy / paste / type a URL', '网址：复制 / 粘贴 / 手输') },
+    { icon: 'link', label: t('Short address bar — click to edit URL', '短地址栏：点击修改网址') },
     { icon: 'star', label: t('Favorites — save & jump', '收藏夹：存台 / 换台') },
     { icon: null, glyph: '⚽', label: t('World Cup home', '世界杯直播主页') },
     { icon: 'play', label: t('Play / pause', '播放 / 暂停') },
     { icon: 'vol', label: t('Mute · hover for volume', '静音 · 悬停出音量条') },
     { icon: 'cinema', label: t('Cinema ⇄ browse mode', '观影 ⇄ 浏览模式') },
-    { icon: 'expand', label: t('Video fullscreen · Esc to exit', '视频全屏 · Esc 退出') },
+    { icon: 'expand', label: t('Browser fullscreen · Esc to exit', '浏览器全屏 · Esc 退出') },
     { icon: 'gear', label: t('Settings', '设置') },
     { icon: 'pointer', label: t('Ghost mode (click-through)', '穿透模式') },
     { icon: 'hand', label: t('Drag handle — move window', '拖把手：移动窗口') },
@@ -832,10 +832,12 @@ function makeCheats(): CheatItem[] {
       label: t('Click-through opacity down', '穿透时降低不透明度')
     },
     { action: 'playpause', label: t('Play / pause', '播放 / 暂停') },
+    { action: 'seekBack', label: t('Seek backward 10 seconds', '快退 10 秒') },
+    { action: 'seekForward', label: t('Seek forward 10 seconds', '快进 10 秒') },
     { action: 'mode', label: t('Cinema / browse mode', '观影 / 浏览模式') },
     {
       action: 'fullscreen',
-      label: t('Video fullscreen (Esc to exit)', '视频全屏（Esc 退出）')
+      label: t('Browser fullscreen (Esc to exit)', '浏览器全屏（Esc 退出）')
     }
   ]
 }
@@ -1077,13 +1079,16 @@ function makeModeGuides(): ModeGuide[] {
     },
     {
       mode: 'window-fullscreen-info',
-      title: t('Video Fullscreen', '视频全屏'),
+      title: t('Browser Fullscreen', '浏览器全屏'),
       keys: shortcutKeys('fullscreen'),
       hint: t(
-        `Press ${shortcutText('fullscreen')} to make Peeko and the video fill the screen.`,
-        `按 ${shortcutText('fullscreen')}，Peeko 和视频一起进入全屏。`
+        `Press ${shortcutText('fullscreen')} to make the Peeko browser fill the screen.`,
+        `按 ${shortcutText('fullscreen')}，让 Peeko 浏览器进入全屏。`
       ),
-      fact: t('Esc exits video fullscreen.', 'Esc 退出视频全屏。')
+      fact: t(
+        'Esc exits browser fullscreen. Website player fullscreen stays independent.',
+        'Esc 退出浏览器全屏。网页播放器全屏保持独立。'
+      )
     },
     {
       mode: 'web-fullscreen-info',

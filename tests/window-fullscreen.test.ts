@@ -270,7 +270,7 @@ describe('window fullscreen visibility', () => {
     setPassthrough(true)
 
     expect(win.setFullScreen).toHaveBeenCalledWith(false)
-    expect(view.webContents.send).toHaveBeenCalledWith('page:exit-video-fullscreen')
+    expect(view.webContents.send).not.toHaveBeenCalledWith('page:exit-video-fullscreen')
     expect(win.setOpacity).toHaveBeenLastCalledWith(0.55)
     expect(view.webContents.send).toHaveBeenCalledWith('state:passthrough', true)
   })

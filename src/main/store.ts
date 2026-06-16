@@ -35,8 +35,12 @@ const LEGACY_DEFAULT_SHORTCUTS: Partial<ShortcutMap> = {
   mute: 'Alt+Shift+M',
   passthrough: 'Alt+Shift+T',
   fullscreen: 'Alt+Shift+Enter',
+  volumeUp: 'Control+Up',
+  volumeDown: 'Control+Down',
   opacityUp: 'Control+Up',
-  opacityDown: 'Control+Down'
+  opacityDown: 'Control+Down',
+  seekBack: 'Control+Left',
+  seekForward: 'Control+Right'
 }
 const LEGACY_FULLSCREEN_DEFAULT = 'Control+Shift+Enter'
 

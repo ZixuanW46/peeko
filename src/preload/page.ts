@@ -19,6 +19,7 @@ import {
 } from '../shared/shortcuts'
 import {
   effectiveVolumeFor,
+  formatShortAddress,
   shouldCapturePageShortcut,
   shouldForwardPageDoubleClick
 } from './ui-logic'
@@ -364,7 +365,6 @@ document.addEventListener(
       if (n?.isConnected) root.appendChild(n)
     }
     updateBar()
-    if (!document.fullscreenElement && floatFullscreen) ipcRenderer.send('ctrl:exit-fullscreen')
   },
   true
 )
@@ -378,8 +378,7 @@ const GLASS = `
   box-shadow: 0 4px 16px rgba(0,0,0,.34), inset 0 0 0 .5px rgba(255,255,255,.22);
 `
 const SIDE_BUTTON_BG = 'rgba(28,28,32,.45)'
-const SIDE_BUTTON_HOVER_BG = 'rgba(255,255,255,.14)'
-const SIDE_BUTTON_PRESS_BG = 'rgba(255,255,255,.22)'
+const SIDE_BUTTON_HOVER_BG = 'rgba(255,255,255,.18)'
 const SIDE_BUTTON_SIZE = 34
 const SIDE_BUTTON_GAP = 12
 const HANDLE_OFFSET = SIDE_BUTTON_SIZE + SIDE_BUTTON_GAP
@@ -387,12 +386,7 @@ const HANDLE_OFFSET = SIDE_BUTTON_SIZE + SIDE_BUTTON_GAP
 function setSideButtonState(node: HTMLElement, hover: boolean, pressed = false): void {
   node.dataset.hover = hover ? '1' : ''
   node.dataset.pressed = pressed ? '1' : ''
-  node.style.background = pressed
-    ? SIDE_BUTTON_PRESS_BG
-    : hover
-      ? SIDE_BUTTON_HOVER_BG
-      : SIDE_BUTTON_BG
-  node.style.transform = pressed ? 'scale(.94)' : 'scale(1)'
+  node.style.background = hover || pressed ? SIDE_BUTTON_HOVER_BG : SIDE_BUTTON_BG
 }
 
 function releaseSideButton(node: HTMLElement): void {
@@ -625,6 +619,17 @@ const BTN = `
   display: flex; align-items: center; justify-content: center; padding: 0;
 `
 
+const URL_CHIP = `
+  height: 30px; min-width: 92px; max-width: min(168px, 32vw);
+  border: 0; border-radius: 99px; box-sizing: border-box;
+  background: rgba(255,255,255,.08); color: rgba(255,255,255,.78); cursor: text;
+  display: flex; align-items: center; gap: 7px; padding: 0 10px;
+  box-shadow: inset 0 0 0 .5px rgba(255,255,255,.18);
+  font: 11px 'SF Mono', ui-monospace, monospace;
+  overflow: hidden; flex: 0 1 168px;
+  transition: background .12s ease-out, box-shadow .12s ease-out;
+`
+
 function capText(target: HTMLElement): string {
   const base = target.dataset.capBase ?? ''
   const action = target.dataset.shortcutAction as Action | undefined
@@ -682,17 +687,15 @@ ipcRenderer.on('state:fullscreen', (_e, on: boolean) => {
 ipcRenderer.on('ui:reveal-control', (_e, control: 'volume' | 'opacity') => {
   revealControl(control)
 })
-ipcRenderer.on('page:exit-video-fullscreen', () => {
-  if (document.fullscreenElement) void document.exitFullscreen().catch(() => {})
-})
 
 interface Bar {
   pill: HTMLElement
   iconRow: HTMLElement
   urlInput: HTMLInputElement
+  urlChip: HTMLElement
+  urlText: HTMLElement
   favPanel: HTMLElement
   back: HTMLElement
-  link: HTMLElement
   fav: HTMLElement
   ball: HTMLElement
   gear: HTMLElement
@@ -712,7 +715,7 @@ const bar = ((): Bar | null => {
        padding: 4px 8px; border-radius: 99px; ${GLASS}
        z-index: 2147483647; opacity: 0;
        transition: opacity .2s ease-out, box-shadow .25s ease-out;
-       pointer-events: none;`
+       pointer-events: none; overflow: hidden;`
     )
     pill.setAttribute('data-peeko-badge', '')
 
@@ -742,10 +745,34 @@ const bar = ((): Bar | null => {
 
     const send = (channel: string) => (): void => ipcRenderer.send(channel)
     const back = mk(send('ctrl:back'), tr('Back', '返回上一页'))
-    const link = mk(
-      () => openUrlInput(),
-      tr('URL: copy, paste, or type', '网址：复制 / 粘贴加载 / 手输')
+    const urlChip = el('button', URL_CHIP)
+    const urlGlyph = icon('link')
+    urlGlyph.style.width = '12px'
+    urlGlyph.style.height = '12px'
+    urlGlyph.style.flex = 'none'
+    urlGlyph.style.opacity = '.72'
+    const urlText = el(
+      'span',
+      `display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;`
     )
+    urlText.textContent = formatShortAddress(location.href)
+    urlChip.append(urlGlyph, urlText)
+    setTip(urlChip, tr('Short address bar: click to edit URL', '短地址栏：点击修改网址'))
+    urlChip.addEventListener('mouseenter', () => {
+      urlChip.style.background = 'rgba(255,255,255,.14)'
+      urlChip.style.boxShadow = 'inset 0 0 0 .5px rgba(255,255,255,.3)'
+    })
+    urlChip.addEventListener('mouseleave', () => {
+      urlChip.style.background = 'rgba(255,255,255,.08)'
+      urlChip.style.boxShadow = 'inset 0 0 0 .5px rgba(255,255,255,.18)'
+    })
+    urlChip.addEventListener('click', (e) => {
+      if (!trusted(e)) return
+      e.stopPropagation()
+      openUrlInput()
+    })
+    urlChip.addEventListener('dblclick', (e) => e.stopPropagation())
+    iconRow.appendChild(urlChip)
     const fav = mk(() => void toggleFavPanel(), tr('Favorites', '收藏夹'))
     const ball = mk(send('ctrl:home'), tr('World Cup home', '世界杯直播主页'))
     ball.textContent = '⚽' // 黑白 emoji，天然灰阶
@@ -787,9 +814,13 @@ const bar = ((): Bar | null => {
     // 网址输入态：预填当前地址并全选——⌘C 即复制，⌘V+回车即加载，打字即手输
     const urlInput = document.createElement('input')
     urlInput.style.cssText = `
-      display: none; width: 320px; max-width: 76vw; border: 0; outline: 0; border-radius: 6px;
+      display: none; position: absolute; left: 8px; right: 8px; top: 4px; height: 30px;
+      box-sizing: border-box; border: 0; outline: 0; border-radius: 99px;
       background: rgba(255,255,255,.12); color: rgba(255,255,255,.9);
-      font: 12px 'SF Mono', ui-monospace, monospace; padding: 5px 9px;
+      box-shadow: inset 0 0 0 .5px rgba(255,255,255,.24);
+      font: 12px 'SF Mono', ui-monospace, monospace; padding: 0 13px;
+      opacity: 0; transform: scaleX(.48); transform-origin: center;
+      transition: opacity .12s ease-out, transform .18s cubic-bezier(.2,.8,.2,1), box-shadow .18s ease-out;
     `
     urlInput.addEventListener('keydown', (e) => {
       if (!trusted(e)) return
@@ -823,9 +854,10 @@ const bar = ((): Bar | null => {
       pill,
       iconRow,
       urlInput,
+      urlChip,
+      urlText,
       favPanel,
       back,
-      link,
       fav,
       ball,
       gear,
@@ -839,6 +871,9 @@ const bar = ((): Bar | null => {
     return null
   }
 })()
+
+updateShortAddress()
+installAddressWatch()
 
 // ============================================================
 // 收藏面板：收藏当前页 + 已收藏列表（点击即开），删除/重命名在设置里
@@ -1170,23 +1205,74 @@ if (opacity) {
   )
 }
 
+let urlInputMotionTimer: ReturnType<typeof setTimeout> | null = null
+
 function openUrlInput(): void {
   if (!bar) return
-  bar.iconRow.style.display = 'none'
+  updateShortAddress()
+  if (urlInputMotionTimer) {
+    clearTimeout(urlInputMotionTimer)
+    urlInputMotionTimer = null
+  }
+  bar.iconRow.style.visibility = 'hidden'
+  bar.iconRow.style.pointerEvents = 'none'
   bar.urlInput.style.display = 'block'
+  bar.urlInput.style.opacity = '0'
+  bar.urlInput.style.transform = 'scaleX(.48)'
   bar.urlInput.value = location.href
   bar.urlInput.focus()
   bar.urlInput.select()
+  requestAnimationFrame(() => {
+    if (!bar || bar.urlInput.style.display !== 'block') return
+    bar.urlInput.style.opacity = '1'
+    bar.urlInput.style.transform = 'scaleX(1)'
+  })
   scheduleSideChromeLayout()
   ipcRenderer.send('bar:editing', true) // 降层让位输入法候选窗
 }
 
 function closeUrlInput(): void {
   if (!bar) return
-  bar.urlInput.style.display = 'none'
-  bar.iconRow.style.display = 'flex'
+  updateShortAddress()
+  if (urlInputMotionTimer) clearTimeout(urlInputMotionTimer)
+  bar.urlInput.style.opacity = '0'
+  bar.urlInput.style.transform = 'scaleX(.48)'
+  urlInputMotionTimer = setTimeout(() => {
+    if (!bar) return
+    bar.urlInput.style.display = 'none'
+    bar.iconRow.style.visibility = 'visible'
+    bar.iconRow.style.pointerEvents = 'auto'
+    scheduleSideChromeLayout()
+  }, 180)
   scheduleSideChromeLayout()
   ipcRenderer.send('bar:editing', false)
+}
+
+function updateShortAddress(): void {
+  if (!bar) return
+  bar.urlText.textContent = formatShortAddress(location.href)
+  bar.urlChip.dataset.href = location.href
+}
+
+function queueShortAddressUpdate(): void {
+  window.setTimeout(updateShortAddress, 0)
+}
+
+function installAddressWatch(): void {
+  window.addEventListener('popstate', queueShortAddressUpdate, true)
+  window.addEventListener('hashchange', queueShortAddressUpdate, true)
+  for (const name of ['pushState', 'replaceState'] as const) {
+    const original = history[name]
+    history[name] = function (
+      this: History,
+      data: unknown,
+      unused: string,
+      url?: string | URL | null
+    ): void {
+      original.call(this, data, unused, url)
+      queueShortAddressUpdate()
+    } as (typeof history)[typeof name]
+  }
 }
 
 function setIcon(btn: HTMLElement, name: string): void {
@@ -1315,8 +1401,9 @@ function syncSideChromeLayout(): void {
 function updateBar(): void {
   if (!bar) return
   const v = biggestVideo()
+  updateShortAddress()
   // 返回/网址/收藏/世界杯/设置是浏览动作，观影模式下收起，控制条保持极简
-  for (const b of [bar.back, bar.link, bar.fav, bar.ball, bar.gear]) {
+  for (const b of [bar.back, bar.urlChip, bar.fav, bar.ball, bar.gear]) {
     b.style.display = cinema ? 'none' : 'flex'
   }
   if (cinema) closeFavPanel()
@@ -1332,7 +1419,7 @@ function updateBar(): void {
   // 按钮提示接线（幂等，每个只接一次）
   for (const b of [
     bar.back,
-    bar.link,
+    bar.urlChip,
     bar.fav,
     bar.ball,
     bar.gear,
@@ -1346,7 +1433,6 @@ function updateBar(): void {
   if (fullscreenBtn) wireCap(fullscreenBtn)
   if (vanishBtn) wireCap(vanishBtn)
   setIcon(bar.back, 'back')
-  setIcon(bar.link, 'link')
   setIcon(bar.fav, 'star')
   setIcon(bar.gear, 'gear')
   // 音量滑条开着时实时同步有效音量（静音 = 0，恢复 = 真实音量）
@@ -1394,7 +1480,7 @@ const handle = ((): HTMLElement | null => {
        border-radius: 50%; display: flex; align-items: center; justify-content: center;
        color: rgba(255,255,255,.85); cursor: grab; ${GLASS}
        z-index: 2147483647; opacity: 0;
-       transition: opacity .2s ease-out, background .12s ease-out, transform .1s ease-out;
+       transition: opacity .2s ease-out, background .12s ease-out;
        pointer-events: none;`
     )
     h.setAttribute('data-peeko-badge', '')
@@ -1444,7 +1530,7 @@ const vanishBtn = ((): HTMLElement | null => {
        border-radius: 50%; display: flex; align-items: center; justify-content: center;
        color: rgba(255,255,255,.85); cursor: pointer; ${GLASS}
        z-index: 2147483647; opacity: 0;
-       transition: opacity .2s ease-out, background .12s ease-out, transform .1s ease-out;
+       transition: opacity .2s ease-out, background .12s ease-out;
        pointer-events: none;`
     )
     q.setAttribute('data-peeko-badge', '')
@@ -1487,7 +1573,7 @@ const fullscreenBtn = ((): HTMLElement | null => {
        border-radius: 50%; display: flex; align-items: center; justify-content: center;
        color: rgba(255,255,255,.85); cursor: pointer; ${GLASS}
        z-index: 2147483647; opacity: 0;
-       transition: opacity .2s ease-out, background .12s ease-out, transform .1s ease-out;
+       transition: opacity .2s ease-out, background .12s ease-out;
        pointer-events: none; padding: 0;`
     )
     b.setAttribute('data-peeko-badge', '')
@@ -1523,8 +1609,8 @@ function updateFullscreenButton(): void {
   setTip(
     fullscreenBtn,
     floatFullscreen
-      ? tr('Exit video fullscreen (Esc)', '退出视频全屏（Esc）')
-      : tr('Video fullscreen', '视频全屏'),
+      ? tr('Exit browser fullscreen (Esc)', '退出浏览器全屏（Esc）')
+      : tr('Browser fullscreen', '浏览器全屏'),
     'fullscreen'
   )
 }
@@ -1532,7 +1618,7 @@ function updateFullscreenButton(): void {
 function updateLocalizedChrome(): void {
   if (bar) {
     setTip(bar.back, tr('Back', '返回上一页'))
-    setTip(bar.link, tr('URL: copy, paste, or type', '网址：复制 / 粘贴加载 / 手输'))
+    setTip(bar.urlChip, tr('Short address bar: click to edit URL', '短地址栏：点击修改网址'))
     setTip(bar.fav, tr('Favorites', '收藏夹'))
     setTip(bar.ball, tr('World Cup home', '世界杯直播主页'))
     setTip(bar.play, tr('Play / pause', '播放 / 暂停'), 'playpause')

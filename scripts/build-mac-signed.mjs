@@ -112,7 +112,8 @@ function assertAppUpdateMetadata(appPath) {
       throw new Error(`Invalid ${basename(file)} ${key}: expected ${value}, got ${doc?.[key]}`)
     }
   }
-  if (!doc.updaterCacheDirName) throw new Error(`Invalid ${basename(file)}: missing updaterCacheDirName`)
+  if (!doc.updaterCacheDirName)
+    throw new Error(`Invalid ${basename(file)}: missing updaterCacheDirName`)
 }
 
 function assertLatestMetadata() {

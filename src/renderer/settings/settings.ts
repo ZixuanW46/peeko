@@ -110,7 +110,7 @@ function actionLabel(action: string): string {
     volumeDown: t('Volume down', '音量降低'),
     mode: t('Cinema / browse mode', '观影 / 浏览模式'),
     passthrough: t('Click-through', '鼠标穿透'),
-    fullscreen: t('Video fullscreen', '视频全屏'),
+    fullscreen: t('Browser fullscreen', '浏览器全屏'),
     opacityUp: t('Click-through opacity up', '穿透不透明度增加'),
     opacityDown: t('Click-through opacity down', '穿透不透明度降低'),
     seekBack: t('Seek backward', '快退'),

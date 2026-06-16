@@ -19,11 +19,7 @@ function shouldKeepLocale(name) {
 }
 
 function appContents(context) {
-  return join(
-    context.appOutDir,
-    `${context.packager.appInfo.productFilename}.app`,
-    'Contents'
-  )
+  return join(context.appOutDir, `${context.packager.appInfo.productFilename}.app`, 'Contents')
 }
 
 function frameworkResources(context) {
@@ -45,7 +41,9 @@ function firstPublishConfig(config) {
 function writeUpdateFeed(context) {
   const publish = firstPublishConfig(context.packager.config.publish)
   if (!publish || publish.provider !== 'github' || !publish.owner || !publish.repo) {
-    throw new Error('Peeko macOS update feed requires publish.provider/owner/repo in electron-builder.yml.')
+    throw new Error(
+      'Peeko macOS update feed requires publish.provider/owner/repo in electron-builder.yml.'
+    )
   }
 
   const cacheName = `${context.packager.appInfo.sanitizedName ?? 'peeko'}-updater`

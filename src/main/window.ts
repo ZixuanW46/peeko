@@ -210,7 +210,6 @@ export function isWindowFullscreen(): boolean {
 
 export function exitWindowFullscreen(): boolean {
   if (!float || !fullscreen) return false
-  float.pageView.webContents.send('page:exit-video-fullscreen')
   float.win.setFullScreen(false)
   return true
 }

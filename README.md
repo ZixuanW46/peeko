@@ -65,12 +65,12 @@ All shortcuts can be changed in Settings.
 | `Command + Q`                 | Quit Peeko when Peeko is focused (macOS standard). |
 | `Control + P`                 | Play / pause.                                      |
 | `Control + M`                 | Mute toggle.                                       |
-| `Control + Up / Down`         | Raise / lower video volume by 10%.                 |
+| `Control + Command + Up / Down` | Raise / lower video volume by 10%.               |
 | `Control + B`                 | Browser / Cinema Mode.                             |
 | `Control + T`                 | Click-through toggle.                              |
-| `Control + Enter`             | Video fullscreen.                                  |
+| `Control + Enter`             | Browser fullscreen.                                |
 | `Control + Shift + Up / Down` | Raise / lower click-through opacity by 5%.         |
-| `Control + Left / Right`      | Seek backward / forward by 10 seconds.             |
+| `Control + Command + Left / Right` | Seek backward / forward by 10 seconds.        |
 
 ### Download
 
@@ -135,12 +135,12 @@ Peeko 不是内容平台，也不托管视频。它只是一个本地浏览器�
 | `Command + Q`                 | Peeko 被选中时退出 Peeko（macOS 标准）。 |
 | `Control + P`                 | 播放 / 暂停。                            |
 | `Control + M`                 | 静音切换。                               |
-| `Control + Up / Down`         | 音量增加 / 降低 10%。                    |
+| `Control + Command + Up / Down` | 音量增加 / 降低 10%。                  |
 | `Control + B`                 | 浏览 / 观影模式切换。                    |
 | `Control + T`                 | 鼠标穿透切换。                           |
-| `Control + Enter`             | 视频全屏。                               |
+| `Control + Enter`             | 浏览器全屏。                              |
 | `Control + Shift + Up / Down` | 穿透不透明度增加 / 降低 5%。             |
-| `Control + Left / Right`      | 快退 / 快进 10 秒。                      |
+| `Control + Command + Left / Right` | 快退 / 快进 10 秒。                 |
 
 ### 下载
 

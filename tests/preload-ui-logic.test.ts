@@ -7,6 +7,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   effectiveVolumeFor,
+  formatShortAddress,
   shouldCapturePageShortcut,
   shouldForwardPageDoubleClick
 } from '../src/preload/ui-logic'
@@ -32,10 +33,25 @@ describe('preload UI logic', () => {
     expect(effectiveVolumeFor({ muted: true, volume: 0.42 }, false)).toBe(0)
   })
 
+  it('短地址条去掉协议和 www，只保留域名与第一段路径', () => {
+    expect(formatShortAddress('https://www.xiaohongshu.com/worldcup26?from=peeko')).toBe(
+      'xiaohongshu.com/worldcup26'
+    )
+    expect(formatShortAddress('https://www.bilibili.com/video/BV1xx411c7mD?p=1')).toBe(
+      'bilibili.com/video/...'
+    )
+    expect(formatShortAddress('https://worldcup.live')).toBe('worldcup.live')
+  })
+
+  it('短地址条遇到不可解析地址时回退到原始文本截断', () => {
+    expect(formatShortAddress('not a url')).toBe('not a url')
+    expect(formatShortAddress('x'.repeat(48))).toBe('x'.repeat(40))
+  })
+
   it('Peeko 快捷键在页面捕获阶段吞掉，避免网页播放器重复消费', () => {
     const shortcuts = {
-      volumeUp: 'Control+Up',
-      volumeDown: 'Control+Down',
+      volumeUp: 'Control+Command+Up',
+      volumeDown: 'Control+Command+Down',
       opacityUp: 'Control+Shift+Up',
       opacityDown: 'Control+Shift+Down',
       fullscreen: 'Alt+Shift+Enter',
@@ -63,7 +79,7 @@ describe('preload UI logic', () => {
           ctrlKey: true,
           altKey: false,
           shiftKey: false,
-          metaKey: false
+          metaKey: true
         },
         shortcuts
       )
@@ -76,7 +92,7 @@ describe('preload UI logic', () => {
           ctrlKey: true,
           altKey: false,
           shiftKey: false,
-          metaKey: false
+          metaKey: true
         },
         shortcuts
       )

@@ -100,17 +100,39 @@ describe('store 文件命名', () => {
     expect(store.data.shortcuts.fullscreen).toBe('Control+Enter')
   })
 
-  it('旧透明度方向键默认迁移到 Control+Shift，给音量让出 Control+上下', async () => {
+  it('旧透明度方向键默认迁移到 Control+Shift', async () => {
     writeFileSync(
       join(electron.userData, 'peeko-store.json'),
       JSON.stringify({ shortcuts: { opacityUp: 'Control+Up', opacityDown: 'Control+Down' } })
     )
     const { store } = await loadStore()
 
-    expect(store.data.shortcuts.volumeUp).toBe('Control+Up')
-    expect(store.data.shortcuts.volumeDown).toBe('Control+Down')
+    expect(store.data.shortcuts.volumeUp).toBe('Control+Command+Up')
+    expect(store.data.shortcuts.volumeDown).toBe('Control+Command+Down')
     expect(store.data.shortcuts.opacityUp).toBe('Control+Shift+Up')
     expect(store.data.shortcuts.opacityDown).toBe('Control+Shift+Down')
+  })
+
+  it('旧音量方向键默认迁移到 Control+Command，避开 macOS 调度中心', async () => {
+    writeFileSync(
+      join(electron.userData, 'peeko-store.json'),
+      JSON.stringify({ shortcuts: { volumeUp: 'Control+Up', volumeDown: 'Control+Down' } })
+    )
+    const { store } = await loadStore()
+
+    expect(store.data.shortcuts.volumeUp).toBe('Control+Command+Up')
+    expect(store.data.shortcuts.volumeDown).toBe('Control+Command+Down')
+  })
+
+  it('旧快进快退默认迁移到 Control+Command，避开 macOS 桌面切换', async () => {
+    writeFileSync(
+      join(electron.userData, 'peeko-store.json'),
+      JSON.stringify({ shortcuts: { seekBack: 'Control+Left', seekForward: 'Control+Right' } })
+    )
+    const { store } = await loadStore()
+
+    expect(store.data.shortcuts.seekBack).toBe('Control+Command+Left')
+    expect(store.data.shortcuts.seekForward).toBe('Control+Command+Right')
   })
 
   it('用户自定义快捷键不被默认迁移覆盖', async () => {

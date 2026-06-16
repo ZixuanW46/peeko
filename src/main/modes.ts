@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 依赖 electron 的 screen，./window 浮窗单例，./store 几何持久化，./sites 注入执行器
- * [OUTPUT]: 对外提供 enterCinema/exitCinema/toggleCinema/isCinema 与浏览语义视频全屏编排
+ * [OUTPUT]: 对外提供 enterCinema/exitCinema/toggleCinema/isCinema 与浏览器窗口全屏编排
  * [POS]: main 的模式编排层——浏览⇄观影的唯一切换通道
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -74,40 +74,7 @@ export async function exitCinema(byUser = false, refreshLayer = true): Promise<v
 
 export const toggleCinema = (): Promise<void> => (cinema ? exitCinema(true) : enterCinema())
 
-const JS_REQUEST_VIDEO_FULLSCREEN = `(() => {
-  const allVideos = (root, acc = []) => {
-    root.querySelectorAll?.('video').forEach(v => acc.push(v))
-    root.querySelectorAll?.('*').forEach(el => {
-      if (el.shadowRoot) allVideos(el.shadowRoot, acc)
-    })
-    return acc
-  }
-  const area = (el) => {
-    const r = el.getBoundingClientRect()
-    return r.width * r.height
-  }
-  const v = allVideos(document).sort((a, b) => area(b) - area(a))[0]
-  if (!v?.requestFullscreen) return false
-  const vr = v.getBoundingClientRect()
-  const videoArea = Math.max(1, vr.width * vr.height)
-  let target = v
-  for (let n = v.parentElement; n && n !== document.body && n !== document.documentElement; n = n.parentElement) {
-    const r = n.getBoundingClientRect()
-    const parentArea = r.width * r.height
-    if (r.width >= vr.width * .9 && r.height >= vr.height * .9 && parentArea <= videoArea * 6) target = n
-  }
-  const req = target.requestFullscreen ?? v.requestFullscreen
-  return Promise.resolve(req.call(target, { navigationUI: 'hide' })).then(() => true).catch(() => false)
-})()`
-
-function requestVideoFullscreen(): void {
-  getFloat()
-    ?.pageView.webContents.executeJavaScript(JS_REQUEST_VIDEO_FULLSCREEN, true)
-    .catch(() => {})
-}
-
 export function exitPlaybackFullscreen(): void {
-  getFloat()?.pageView.webContents.send('page:exit-video-fullscreen')
   exitWindowFullscreen()
 }
 
@@ -118,7 +85,7 @@ export async function togglePlaybackFullscreen(): Promise<void> {
     return
   }
   if (cinema) await exitCinema(true, false)
-  if (toggleWindowFullscreen()) requestVideoFullscreen()
+  toggleWindowFullscreen()
 }
 
 // ============================================================

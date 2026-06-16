@@ -24,15 +24,15 @@ export const DEFAULT_SHORTCUTS: ShortcutMap = {
   quit: 'Control+Q',
   playpause: 'Control+P',
   mute: 'Control+M',
-  volumeUp: 'Control+Up',
-  volumeDown: 'Control+Down',
+  volumeUp: 'Control+Command+Up',
+  volumeDown: 'Control+Command+Down',
   mode: 'Control+B',
   passthrough: 'Control+T',
   fullscreen: 'Control+Enter',
   opacityUp: 'Control+Shift+Up',
   opacityDown: 'Control+Shift+Down',
-  seekBack: 'Control+Left',
-  seekForward: 'Control+Right'
+  seekBack: 'Control+Command+Left',
+  seekForward: 'Control+Command+Right'
 }
 
 export function prettyShortcut(accel: string): string {

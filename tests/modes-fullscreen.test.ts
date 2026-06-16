@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 依赖 src/main/modes 的观影⇄浏览编排，window/store/sites 全部 mock
- * [OUTPUT]: 验证从观影模式进入全屏时先退出观影，再请求网页视频 fullscreen
+ * [OUTPUT]: 验证浏览器窗口全屏与网页视频 fullscreen 互不耦合
  * [POS]: tests 的模式边界守卫，防止观影 CSS 与浏览全屏语义再次缠在一起
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -96,7 +96,7 @@ describe('mode fullscreen orchestration', () => {
     f.isVisible.mockReturnValue(true)
   })
 
-  it('从观影模式进入全屏时退出观影并请求网页视频 fullscreen', async () => {
+  it('从观影模式进入浏览器全屏时退出观影但不请求网页视频 fullscreen', async () => {
     const { enterCinema, togglePlaybackFullscreen } = await import('../src/main/modes')
 
     await enterCinema()
@@ -105,10 +105,16 @@ describe('mode fullscreen orchestration', () => {
     expect(site.ejectRule).toHaveBeenCalledTimes(1)
     expect(f.send).toHaveBeenCalledWith('mode:cinema', false)
     expect(win.toggleWindowFullscreen).toHaveBeenCalledTimes(1)
-    expect(f.executeJavaScript).toHaveBeenCalledWith(
-      expect.stringContaining('requestFullscreen'),
-      true
-    )
+    expect(f.executeJavaScript).not.toHaveBeenCalled()
+  })
+
+  it('普通进入浏览器全屏不请求网页视频 fullscreen', async () => {
+    const { togglePlaybackFullscreen } = await import('../src/main/modes')
+
+    await togglePlaybackFullscreen()
+
+    expect(win.toggleWindowFullscreen).toHaveBeenCalledTimes(1)
+    expect(f.executeJavaScript).not.toHaveBeenCalled()
   })
 
   it('进入观影模式时关闭穿透，避免半透明但不穿透的假状态', async () => {

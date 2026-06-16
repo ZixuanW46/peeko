@@ -1,7 +1,7 @@
 {
   "name": "peeko",
   "productName": "Peeko",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Peeko is a quiet always-on-top mini browser for macOS video pages.",
   "main": "./out/main/index.js",
   "author": "Will",

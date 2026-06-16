@@ -71,15 +71,15 @@ vi.mock('../src/main/store', () => ({
         quit: 'Control+Q',
         playpause: 'Control+P',
         mute: 'Control+M',
-        volumeUp: 'Control+Up',
-        volumeDown: 'Control+Down',
+        volumeUp: 'Control+Command+Up',
+        volumeDown: 'Control+Command+Down',
         mode: 'Control+B',
         passthrough: 'Control+T',
         fullscreen: 'Control+Enter',
         opacityUp: 'Control+Shift+Up',
         opacityDown: 'Control+Shift+Down',
-        seekBack: 'Control+Left',
-        seekForward: 'Control+Right'
+        seekBack: 'Control+Command+Left',
+        seekForward: 'Control+Command+Right'
       }
     },
     patch: vi.fn()
@@ -227,7 +227,7 @@ describe('shortcuts effects', () => {
     expect(win.hideFloatWindow).toHaveBeenCalledTimes(1)
   })
 
-  it('macOS 系统桌面快捷键会进入健康检查，而不是被当作安全键位', async () => {
+  it('macOS 系统桌面快捷键会进入健康检查，但默认快进退避开 Spaces', async () => {
     const { getShortcutHealth, probeShortcut, registerShortcuts } =
       await import('../src/main/shortcuts')
 
@@ -235,17 +235,20 @@ describe('shortcuts effects', () => {
     const seekForward = getShortcutHealth().find((h) => h.action === 'seekForward')!
     const volumeUp = getShortcutHealth().find((h) => h.action === 'volumeUp')!
 
-    expect(seekForward.ok).toBe(false)
+    expect(seekForward.ok).toBe(true)
     expect(seekForward.critical).toBe(false)
-    expect(seekForward.reason).toContain('Mission Control')
-    expect(volumeUp.ok).toBe(false)
+    expect(volumeUp.ok).toBe(true)
+    expect(probeShortcut('volumeUp', 'Control+Up')).toEqual({
+      ok: false,
+      reason: 'This shortcut overlaps macOS Mission Control / Spaces'
+    })
     expect(probeShortcut('seekForward', 'Control+Right')).toEqual({
       ok: false,
       reason: 'This shortcut overlaps macOS Mission Control / Spaces'
     })
   })
 
-  it('方向键动作走 uiohook：音量 5% 步进，透明度用 Ctrl+Shift，快进快退不变', async () => {
+  it('方向键动作走 uiohook：音量 10% 步进，透明度用 Ctrl+Shift，快进快退用 Ctrl+Command', async () => {
     const { registerShortcuts } = await import('../src/main/shortcuts')
 
     registerShortcuts()
@@ -259,17 +262,20 @@ describe('shortcuts effects', () => {
 
     media.audioMuted = true
     media.executeJavaScript.mockResolvedValue(true)
-    keydown({ keycode: 57416, altKey: false, shiftKey: false, ctrlKey: true, metaKey: false })
-    keydown({ keycode: 57424, altKey: false, shiftKey: false, ctrlKey: true, metaKey: false })
+    keydown({ keycode: 57416, altKey: false, shiftKey: false, ctrlKey: true, metaKey: true })
+    keydown({ keycode: 57424, altKey: false, shiftKey: false, ctrlKey: true, metaKey: true })
     await Promise.resolve()
     keydown({ keycode: 57416, altKey: false, shiftKey: true, ctrlKey: true, metaKey: false })
     keydown({ keycode: 57424, altKey: false, shiftKey: true, ctrlKey: true, metaKey: false })
-    keydown({ keycode: 57419, altKey: false, shiftKey: false, ctrlKey: true, metaKey: false })
-    keydown({ keycode: 57421, altKey: false, shiftKey: false, ctrlKey: true, metaKey: false })
+    keydown({ keycode: 57419, altKey: false, shiftKey: false, ctrlKey: true, metaKey: true })
+    keydown({ keycode: 57421, altKey: false, shiftKey: false, ctrlKey: true, metaKey: true })
 
-    expect(electron.register).not.toHaveBeenCalledWith('Control+Up', expect.any(Function))
+    expect(electron.register).not.toHaveBeenCalledWith('Control+Command+Up', expect.any(Function))
     expect(electron.register).not.toHaveBeenCalledWith('Control+Shift+Up', expect.any(Function))
-    expect(electron.register).not.toHaveBeenCalledWith('Control+Right', expect.any(Function))
+    expect(electron.register).not.toHaveBeenCalledWith(
+      'Control+Command+Right',
+      expect.any(Function)
+    )
     expect(media.executeJavaScript).toHaveBeenCalledWith(
       expect.stringContaining('v.volume + 0.1'),
       true
@@ -302,7 +308,7 @@ describe('shortcuts effects', () => {
 
     media.audioMuted = true
     media.executeJavaScript.mockResolvedValue(false)
-    keydown({ keycode: 57416, altKey: false, shiftKey: false, ctrlKey: true, metaKey: false })
+    keydown({ keycode: 57416, altKey: false, shiftKey: false, ctrlKey: true, metaKey: true })
     await Promise.resolve()
 
     expect(media.setAudioMuted).not.toHaveBeenCalled()
